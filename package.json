@@ -1,0 +1,101 @@
+{
+  "name": "md-live-server",
+  "displayName": "Markdown Live Server",
+  "description": "Preview Markdown, Mermaid diagrams, and static web files with a local live-reload server.",
+  "version": "0.0.1",
+  "publisher": "tuld01061",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:md-live-server.start",
+    "onCommand:md-live-server.stop",
+    "onCommand:md-live-server.toggle"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "md-live-server.start",
+        "title": "Start Markdown Live Server",
+        "category": "Markdown Live Server"
+      },
+      {
+        "command": "md-live-server.stop",
+        "title": "Stop Markdown Live Server",
+        "category": "Markdown Live Server"
+      },
+      {
+        "command": "md-live-server.toggle",
+        "title": "Toggle Markdown Live Server",
+        "category": "Markdown Live Server"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "md-live-server.start",
+          "when": "resourceScheme == file",
+          "group": "navigation@100"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "md-live-server.start",
+          "when": "resourceScheme == file",
+          "group": "navigation@100"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "lint:package": "vsce ls --tree"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "markdown-it": "^14.1.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.11.24",
+    "@types/ws": "^8.5.10",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.4.2",
+    "@vscode/vsce": "^3.2.2"
+  },
+  "license": "MIT",
+  "author": "Tu Luu",
+  "homepage": "https://github.com/tuld01061/md-live-server#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuld01061/md-live-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tuld01061/md-live-server/issues"
+  },
+  "icon": "images/icon.png",
+  "keywords": [
+    "markdown",
+    "live server",
+    "preview",
+    "mermaid",
+    "reload",
+    "static server"
+  ],
+  "galleryBanner": {
+    "color": "#0d1117",
+    "theme": "dark"
+  },
+  "qna": "marketplace"
+}
