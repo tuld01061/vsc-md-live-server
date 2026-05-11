@@ -13,6 +13,8 @@ jobs:
   release:
     name: Package, publish, and release
     runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
     steps:
       - name: Checkout
@@ -34,9 +36,7 @@ jobs:
         run: npm run package
 
       - name: Publish to Visual Studio Marketplace
-        if: ${{ secrets.VSCE_PAT != '' }}
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        if: ${{ env.VSCE_PAT != '' }}
         run: npx vsce publish --pat "$VSCE_PAT"
 
       - name: Create GitHub Release
