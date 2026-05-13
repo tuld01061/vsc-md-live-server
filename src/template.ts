@@ -129,6 +129,23 @@ export function renderMarkdownPage(content: string, title: string, port: number)
 </html>`;
 }
 
+export function renderHtmlPage(content: string, port: number): string {
+  const script = `<script>
+  const socket = new WebSocket('ws://127.0.0.1:${port}');
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === 'reload') {
+      location.reload();
+    }
+  });
+</script>`;
+
+  if (/<\/body>/i.test(content)) {
+    return content.replace(/<\/body>/i, script + '\n</body>');
+  }
+  return content + '\n' + script;
+}
+
 export function renderDirectoryPage(requestPath: string, entries: fs.Dirent[]): string {
   const parentPath = path.posix.dirname(requestPath === '/' ? '' : requestPath);
   const links = [requestPath !== '/' ? `<li><a href="${escapeAttribute(parentPath || '/')}">..</a></li>` : '']
