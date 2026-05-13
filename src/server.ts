@@ -5,7 +5,7 @@ import * as path from 'path';
 import express from 'express';
 import MarkdownIt from 'markdown-it';
 import { WebSocketServer, WebSocket } from 'ws';
-import { renderDirectoryPage, renderMarkdownPage } from './template';
+import { renderDirectoryPage, renderHtmlPage, renderMarkdownPage } from './template';
 
 export interface MarkdownLiveServerOptions {
   port?: number;
@@ -58,6 +58,11 @@ export class MarkdownLiveServer {
 
       if (path.extname(filePath).toLowerCase() === '.md') {
         response.send(renderMarkdownPage(this.renderMarkdownFile(filePath), path.basename(filePath), this.currentPort()));
+        return;
+      }
+
+      if (path.extname(filePath).toLowerCase() === '.html') {
+        response.send(renderHtmlPage(fs.readFileSync(filePath, 'utf8'), this.currentPort()));
         return;
       }
 
