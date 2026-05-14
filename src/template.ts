@@ -8,21 +8,73 @@ export function renderMarkdownPage(content: string, title: string, port: number)
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" id="hljs-theme">
   <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-    window.mermaid = mermaid;
-    window.renderMermaid = () => {
+    let mermaid;
+    try {
+      const mod = await import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs');
+      mermaid = mod.default || mod;
+    } catch (e) {
+      console.warn('Mermaid failed to load from CDN', e);
+    }
+
+    let hljs;
+    try {
+      const mod = await import('https://cdn.jsdelivr.net/npm/highlight.js@11/es/highlight.min.js');
+      hljs = mod.default || mod;
+    } catch (e) {
+      console.warn('Highlight.js failed to load from CDN', e);
+    }
+
+    window.hljs = hljs;
+
+    window.renderMermaid = async () => {
+      if (!mermaid) {
+        document.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
+          const msg = document.createElement('div');
+          msg.style.color = 'var(--muted)';
+          msg.style.padding = '1rem';
+          msg.style.border = '1px solid var(--border)';
+          msg.style.borderRadius = '6px';
+          msg.textContent = '[Mermaid unavailable: CDN load failed]';
+          code.parentElement.replaceWith(msg);
+        });
+        return;
+      }
       mermaid.initialize({ startOnLoad: false, theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'default' });
-      document.querySelectorAll('pre > code.language-mermaid').forEach((code, index) => {
+      const codes = document.querySelectorAll('pre > code.language-mermaid');
+      for (let i = 0; i < codes.length; i++) {
+        const code = codes[i];
         const container = document.createElement('div');
         container.className = 'mermaid';
-        container.id = 'mermaid-' + Date.now() + '-' + index;
-        container.textContent = code.textContent;
+        const id = 'mermaid-' + Date.now() + '-' + i;
+        container.id = id;
         code.parentElement.replaceWith(container);
-      });
-      mermaid.run({ querySelector: '.mermaid' });
+        try {
+          const result = await mermaid.render(id, code.textContent || '');
+          container.innerHTML = result.svg;
+        } catch (err) {
+          const pre = document.createElement('pre');
+          pre.style.color = 'var(--muted)';
+          pre.style.border = '1px solid var(--border)';
+          pre.style.padding = '1rem';
+          pre.style.borderRadius = '6px';
+          pre.textContent = 'Mermaid error: ' + (err?.message || err);
+          container.replaceWith(pre);
+        }
+      }
     };
+
+    window.highlightCode = () => {
+      if (!hljs) return;
+      document.querySelectorAll('pre code').forEach((block) => {
+        if (block.classList.contains('language-mermaid')) return;
+        hljs.highlightElement(block);
+      });
+    };
+
     window.renderMermaid();
+    window.highlightCode();
   </script>
   <style>
     :root {
@@ -111,22 +163,56 @@ export function renderMarkdownPage(content: string, title: string, port: number)
       document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
       localStorage.setItem('md-live-server-theme', document.documentElement.dataset.theme);
       updateThemeIcon();
+      const hljsTheme = document.getElementById('hljs-theme');
+      if (hljsTheme) {
+        hljsTheme.href = document.documentElement.dataset.theme === 'dark'
+          ? 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css'
+          : 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css';
+      }
       location.reload();
     });
 
     const socket = new WebSocket('ws://127.0.0.1:${port}');
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
+    });
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.type === 'reload') {
         location.reload();
         return;
       }
-      document.getElementById('content').innerHTML = message.content;
+      const contentDiv = document.getElementById('content');
+      contentDiv.innerHTML = message.content;
+      contentDiv.querySelectorAll('script').forEach((oldScript) => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+        newScript.textContent = oldScript.textContent;
+        oldScript.replaceWith(newScript);
+      });
       window.renderMermaid?.();
+      window.highlightCode?.();
     });
   </script>
 </body>
 </html>`;
+}
+
+export function renderHtmlPage(content: string, port: number): string {
+  const script = `<script>
+  const socket = new WebSocket('ws://127.0.0.1:${port}');
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === 'reload') {
+      location.reload();
+    }
+  });
+</script>`;
+
+  if (/<\/body>/i.test(content)) {
+    return content.replace(/<\/body>/i, script + '\n</body>');
+  }
+  return content + '\n' + script;
 }
 
 export function renderDirectoryPage(requestPath: string, entries: fs.Dirent[]): string {

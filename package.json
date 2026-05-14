@@ -60,7 +60,8 @@
     "package": "vsce package",
     "publish": "vsce publish",
     "lint:package": "vsce ls --tree",
-    "clean": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\""
+    "clean": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\"",
+    "test": "vitest run"
   },
   "dependencies": {
     "express": "^4.18.3",
@@ -75,7 +76,8 @@
     "@types/ws": "^8.5.10",
     "@vscode/vsce": "^3.2.2",
     "esbuild": "^0.28.0",
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.2",
+    "vitest": "^4.1.6"
   },
   "license": "MIT",
   "author": "Tu Luu",

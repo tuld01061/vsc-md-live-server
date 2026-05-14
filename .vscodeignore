@@ -5,6 +5,7 @@
 .vscode-test/**
 node_modules/**
 src/**
+test/**
 out/**/*.map
 *.map
 *.vsix
