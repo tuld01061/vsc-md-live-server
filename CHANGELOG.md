@@ -2,6 +2,13 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.0.3
+
+- Added live reload for HTML files by injecting a WebSocket script into previewed HTML pages.
+- Hardened path resolution with `realpath` checks to prevent symlink directory traversal.
+- Added per-client path tracking so Markdown updates are broadcast only to clients viewing the same file.
+- External links in Markdown previews now open in a new tab with `rel="noopener noreferrer"`.
+
 ## 0.0.2
 
 - Fixed Marketplace package runtime by bundling extension dependencies.

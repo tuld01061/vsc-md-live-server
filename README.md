@@ -8,7 +8,7 @@ Preview Markdown, Mermaid diagrams, and static web files from VS Code with local
 - Render Markdown files as styled HTML.
 - Render Mermaid code blocks.
 - Reload browser automatically when files change.
-- Serve images, CSS, JavaScript, and other static files from workspace.
+- Serve images, CSS, JavaScript, HTML, and other static files from workspace.
 - Switch rendered Markdown between light and dark themes.
 
 ## Usage

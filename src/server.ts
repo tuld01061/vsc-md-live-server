@@ -26,14 +26,17 @@ export class MarkdownLiveServer {
   private readonly markdown = new MarkdownIt({ html: true, linkify: true, typographer: true });
   private readonly port: number;
   private readonly rootPath: string;
+  private readonly rootRealPath: string;
   private readonly entryPath: string;
   private readonly sockets = new Set<net.Socket>();
+  private readonly clientPaths = new WeakMap<WebSocket, string>();
   private httpServer?: http.Server;
   private webSocketServer?: WebSocketServer;
 
   constructor(options: MarkdownLiveServerOptions) {
     this.port = options.port ?? 0;
     this.rootPath = options.rootPath;
+    this.rootRealPath = fs.realpathSync(options.rootPath);
     this.entryPath = options.entryPath;
   }
 
@@ -77,6 +80,18 @@ export class MarkdownLiveServer {
       socket.on('close', () => this.sockets.delete(socket));
     });
     this.webSocketServer = new WebSocketServer({ server: this.httpServer });
+    this.webSocketServer.on('connection', (ws) => {
+      ws.on('message', (data) => {
+        try {
+          const msg = JSON.parse(String(data)) as { type: string; path?: string };
+          if (msg.type === 'subscribe' && msg.path) {
+            this.clientPaths.set(ws, msg.path);
+          }
+        } catch {
+          // ignore malformed messages
+        }
+      });
+    });
 
     await new Promise<void>((resolve, reject) => {
       this.httpServer?.once('error', reject);
@@ -104,16 +119,24 @@ export class MarkdownLiveServer {
     });
   }
 
-  broadcastChange(filePath: string): void {
-    const message: ReloadMessage | MarkdownMessage = path.extname(filePath).toLowerCase() === '.md'
-      ? { type: 'markdown', content: this.renderMarkdownFile(filePath) }
+  broadcastChange(filePath: string, content?: string): void {
+    const isMarkdown = path.extname(filePath).toLowerCase() === '.md';
+    const requestPath = this.toRequestPath(filePath);
+
+    const message: ReloadMessage | MarkdownMessage = isMarkdown
+      ? { type: 'markdown', content: content !== undefined ? this.renderMarkdown(content) : this.renderMarkdownFile(filePath) }
       : { type: 'reload' };
 
     const payload = JSON.stringify(message);
     this.webSocketServer?.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
+      if (client.readyState !== WebSocket.OPEN) {
+        return;
       }
+      const clientPath = this.clientPaths.get(client);
+      if (isMarkdown && clientPath && clientPath !== requestPath) {
+        return;
+      }
+      client.send(payload);
     });
   }
 
@@ -129,20 +152,41 @@ export class MarkdownLiveServer {
     return `http://127.0.0.1:${this.currentPort()}${this.toRequestPath(this.entryPath)}`;
   }
 
-  private resolveRequestPath(requestPath: string): string | undefined {
-    const decodedPath = decodeURIComponent(requestPath);
-    const filePath = path.normalize(path.join(this.rootPath, decodedPath));
-    if (!filePath.startsWith(this.rootPath)) {
+  resolveRequestPath(requestPath: string): string | undefined {
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(requestPath);
+    } catch {
       return undefined;
     }
-    if (!fs.existsSync(filePath)) {
+    const joinedPath = path.normalize(path.join(this.rootPath, decodedPath));
+    const relativePath = path.relative(this.rootPath, joinedPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       return undefined;
     }
-    return filePath;
+    let resolvedPath: string;
+    try {
+      resolvedPath = fs.realpathSync(joinedPath);
+    } catch {
+      return undefined;
+    }
+    const resolvedRelative = path.relative(this.rootRealPath, resolvedPath);
+    if (resolvedRelative.startsWith('..') || path.isAbsolute(resolvedRelative)) {
+      return undefined;
+    }
+    return resolvedPath;
   }
 
-  private renderMarkdownFile(filePath: string): string {
-    return this.markdown.render(fs.readFileSync(filePath, 'utf8'));
+  renderMarkdownFile(filePath: string): string {
+    return this.renderMarkdown(fs.readFileSync(filePath, 'utf8'));
+  }
+
+  private renderMarkdown(source: string): string {
+    return this.addLinkTargets(this.markdown.render(source));
+  }
+
+  private addLinkTargets(html: string): string {
+    return html.replace(/<a href="(https?:\/\/[^"]*)"/gi, '<a href="$1" target="_blank" rel="noopener noreferrer"');
   }
 
   private toRequestPath(filePath: string): string {

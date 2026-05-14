@@ -22,8 +22,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('md-live-server.toggle', toggleServer),
     vscode.window.onDidChangeActiveTextEditor(updateStatusBar),
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (liveRootPath && isInsideRoot(event.document.uri.fsPath, liveRootPath)) {
-        liveServer?.broadcastChange(event.document.uri.fsPath);
+      if (liveRootPath && isInsideRoot(event.document.uri.fsPath, liveRootPath) && event.document.languageId === 'markdown') {
+        liveServer?.broadcastChange(event.document.uri.fsPath, event.document.getText());
       }
     }),
     vscode.workspace.onDidSaveTextDocument((document) => {
@@ -54,6 +54,10 @@ async function toggleServer(): Promise<void> {
 }
 
 async function startServer(resource?: vscode.Uri): Promise<void> {
+  if (serverState === 'starting' || serverState === 'stopping') {
+    return;
+  }
+
   const entryPath = getEntryPath(resource);
   if (!entryPath) {
     vscode.window.showWarningMessage('Open a file or folder first.');
@@ -74,8 +78,8 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
     livePort = await liveServer.start();
     serverState = 'started';
     updateStatusBar();
-    await vscode.env.openExternal(vscode.Uri.parse(liveServer.entryUrl()));
   } catch (error) {
+    await liveServer?.stop();
     liveServer = undefined;
     liveRootPath = undefined;
     livePort = undefined;
@@ -83,10 +87,22 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
     updateStatusBar();
     const message = error instanceof Error ? error.message : String(error);
     vscode.window.showErrorMessage(`Markdown Live Server failed: ${message}`);
+    return;
+  }
+
+  try {
+    await vscode.env.openExternal(vscode.Uri.parse(liveServer.entryUrl()));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    vscode.window.showWarningMessage(`Could not open browser: ${message}`);
   }
 }
 
 async function stopServer(): Promise<void> {
+  if (serverState === 'starting' || serverState === 'stopping') {
+    return;
+  }
+
   if (!liveServer) {
     serverState = 'stopped';
     updateStatusBar();
