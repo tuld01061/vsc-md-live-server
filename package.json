@@ -81,13 +81,13 @@
   },
   "license": "MIT",
   "author": "Tu Luu",
-  "homepage": "https://github.com/tuld01061/md-live-server#readme",
+  "homepage": "https://github.com/tuld01061/vsc-md-live-server#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tuld01061/md-live-server.git"
+    "url": "https://github.com/tuld01061/vsc-md-live-server.git"
   },
   "bugs": {
-    "url": "https://github.com/tuld01061/md-live-server/issues"
+    "url": "https://github.com/tuld01061/vsc-md-live-server/issues"
   },
   "icon": "images/icon.png",
   "keywords": [
