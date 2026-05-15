@@ -164,7 +164,10 @@ function updateStatusBar(): void {
 
   if (liveServer) {
     statusBarItem.text = `$(circle-slash) Port: ${livePort ?? liveServer.currentPort()}`;
-    statusBarItem.tooltip = 'Stop Markdown Live Server';
+    const lanUrl = liveServer.lanUrl();
+    statusBarItem.tooltip = lanUrl
+      ? `Local: ${liveServer.entryUrl()}\nLAN: ${lanUrl}\nClick to stop`
+      : 'Stop Markdown Live Server';
     statusBarItem.show();
     return;
   }

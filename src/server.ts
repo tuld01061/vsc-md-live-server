@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as http from 'http';
 import * as net from 'net';
+import * as os from 'os';
 import * as path from 'path';
 import express from 'express';
 import MarkdownIt from 'markdown-it';
@@ -95,7 +96,7 @@ export class MarkdownLiveServer {
 
     await new Promise<void>((resolve, reject) => {
       this.httpServer?.once('error', reject);
-      this.httpServer?.listen(this.port, '127.0.0.1', () => resolve());
+      this.httpServer?.listen(this.port, '0.0.0.0', () => resolve());
     });
 
     return this.currentPort();
@@ -150,6 +151,18 @@ export class MarkdownLiveServer {
 
   entryUrl(): string {
     return `http://127.0.0.1:${this.currentPort()}${this.toRequestPath(this.entryPath)}`;
+  }
+
+  lanUrl(): string | undefined {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name] ?? []) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          return `http://${iface.address}:${this.currentPort()}${this.toRequestPath(this.entryPath)}`;
+        }
+      }
+    }
+    return undefined;
   }
 
   resolveRequestPath(requestPath: string): string | undefined {
