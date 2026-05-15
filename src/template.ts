@@ -47,10 +47,9 @@ export function renderMarkdownPage(content: string, title: string, port: number)
         const code = codes[i];
         const container = document.createElement('div');
         container.className = 'mermaid';
-        const id = 'mermaid-' + Date.now() + '-' + i;
-        container.id = id;
         code.parentElement.replaceWith(container);
         try {
+          const id = 'mermaid-' + Date.now() + '-' + i;
           const result = await mermaid.render(id, code.textContent || '');
           container.innerHTML = result.svg;
         } catch (err) {
