@@ -64,11 +64,24 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
     return;
   }
 
+  const rootPath = getRootPath(entryPath);
+
+  if (liveServer && liveRootPath && isInsideRoot(entryPath, liveRootPath)) {
+    liveServer.setEntryPath(entryPath);
+    updateStatusBar();
+    try {
+      await vscode.env.openExternal(vscode.Uri.parse(liveServer.entryUrl()));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showWarningMessage(`Could not open browser: ${message}`);
+    }
+    return;
+  }
+
   if (liveServer) {
     await stopServer();
   }
 
-  const rootPath = getRootPath(entryPath);
   liveRootPath = rootPath;
   liveServer = new MarkdownLiveServer({ rootPath, entryPath });
   serverState = 'starting';
