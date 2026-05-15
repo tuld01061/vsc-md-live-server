@@ -2,6 +2,12 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.0.4
+
+- Fixed server not being exposed to LAN so external devices can access previews.
+- Fixed Mermaid diagram rendering.
+- Fixed server reuse for files in the same workspace, preventing duplicate server startup.
+
 ## 0.0.3
 
 - Added live reload for HTML files by injecting a WebSocket script into previewed HTML pages.
