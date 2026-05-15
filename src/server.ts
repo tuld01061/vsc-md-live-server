@@ -28,7 +28,7 @@ export class MarkdownLiveServer {
   private readonly port: number;
   private readonly rootPath: string;
   private readonly rootRealPath: string;
-  private readonly entryPath: string;
+  private entryPath: string;
   private readonly sockets = new Set<net.Socket>();
   private readonly clientPaths = new WeakMap<WebSocket, string>();
   private httpServer?: http.Server;
@@ -147,6 +147,10 @@ export class MarkdownLiveServer {
       return this.port;
     }
     return address.port;
+  }
+
+  setEntryPath(entryPath: string): void {
+    this.entryPath = entryPath;
   }
 
   entryUrl(): string {
