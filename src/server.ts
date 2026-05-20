@@ -6,7 +6,7 @@ import * as path from 'path';
 import express from 'express';
 import MarkdownIt from 'markdown-it';
 import { WebSocketServer, WebSocket } from 'ws';
-import { renderDirectoryPage, renderHtmlPage, renderMarkdownPage } from './template';
+import { renderDirectoryMarkdownPage, renderHtmlPage, renderMarkdownPage } from './template';
 import { scanDirectory, TreeNode, ScanOptions } from './tree';
 
 export interface MarkdownLiveServerOptions {
@@ -61,7 +61,12 @@ export class MarkdownLiveServer {
       }
 
       if (fs.statSync(filePath).isDirectory()) {
-        response.send(renderDirectoryPage(request.path, fs.readdirSync(filePath, { withFileTypes: true })));
+        response.send(renderDirectoryMarkdownPage(
+          request.path,
+          fs.readdirSync(filePath, { withFileTypes: true }),
+          this.currentPort(),
+          this.siteMenuOptions ? this.siteTree : undefined
+        ));
         return;
       }
 
