@@ -7,7 +7,7 @@ describe('renderMarkdownPage', () => {
     const tree: TreeNode[] = [{ name: 'readme.md', path: '/readme.md', type: 'file' }];
     const html = renderMarkdownPage('# Hello', 'Test', 3000, tree);
     expect(html).toContain('id="site-menu"');
-    expect(html).toContain('__SITE_TREE__');
+    expect(html).toContain('__SITE_TREE_UPDATE__');
     expect(html).toContain('/readme.md');
     expect(html).toContain('treeUpdate');
   });
@@ -15,10 +15,10 @@ describe('renderMarkdownPage', () => {
   it('does not include sidebar when siteTree is undefined', () => {
     const html = renderMarkdownPage('# Hello', 'Test', 3000);
     expect(html).not.toContain('id="site-menu"');
-    expect(html).not.toContain('__SITE_TREE__');
+    expect(html).not.toContain('__SITE_TREE_UPDATE__');
   });
 
-  it('does not include sidebar when siteTree is empty', () => {
+  it('includes empty sidebar when siteTree is empty array', () => {
     const html = renderMarkdownPage('# Hello', 'Test', 3000, []);
     expect(html).toContain('id="site-menu"');
   });
@@ -28,7 +28,7 @@ describe('renderHtmlPage', () => {
   it('includes sidebar script when tree is provided', () => {
     const tree: TreeNode[] = [{ name: 'readme.md', path: '/readme.md', type: 'file' }];
     const html = renderHtmlPage('<html><body><h1>Test</h1></body></html>', 3000, tree);
-    expect(html).toContain('__SITE_TREE__');
+    expect(html).toContain('__SITE_TREE_UPDATE__');
     expect(html).toContain('id="site-menu"');
   });
 

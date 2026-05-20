@@ -177,7 +177,6 @@ export function renderMarkdownPage(content: string, title: string, port: number,
         return;
       }
       if (message.type === 'treeUpdate') {
-        window.__SITE_TREE__ = message.tree;
         if (window.__SITE_TREE_UPDATE__) window.__SITE_TREE_UPDATE__(message.tree);
         return;
       }
@@ -397,11 +396,22 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
       </div>
       <div id="site-menu-tree" style="font-size: 0.875rem;"></div>
     </aside>
-    <button id="site-menu-toggle" style="position: fixed; top: 1rem; left: 1rem; z-index: 101; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; display: none;">☰</button>
-    <div style="margin-left: 260px; padding: 2rem;">
+    <button id="site-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 101; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; display: none;">☰</button>
   ` : '';
 
   const sidebarScript = hasSidebar ? `
+    <style>
+      #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid #d0d7de; overflow-y: auto; padding: 1rem; background: #fff; z-index: 100; box-sizing: border-box; }
+      #site-menu-search { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #d0d7de; border-radius: 4px; margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.875rem; }
+      #site-menu-tree { font-size: 0.875rem; }
+      #site-menu-tree ul { list-style: none; padding: 0; margin: 0; }
+      #site-menu-tree ul ul { padding-left: 0.75rem; }
+      #site-menu-tree li { margin: 0.15rem 0; }
+      #site-menu-tree a { text-decoration: none; display: block; padding: 0.15rem 0; color: #24292f; }
+      #site-menu-tree a:hover { color: #0969da; }
+      #site-menu-tree a.active { font-weight: bold; color: #0969da; }
+      @media (max-width: 768px) { #site-menu { transform: translateX(-100%); transition: transform 0.2s; } #site-menu.open { transform: translateX(0); } #site-menu-toggle { display: block !important; } }
+    </style>
     <script>
     (function() {
       let currentTree = ${JSON.stringify(siteTree)};
@@ -510,7 +520,6 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
       const message = JSON.parse(event.data);
       if (message.type === 'reload') { location.reload(); }
       if (message.type === 'treeUpdate') {
-        window.__SITE_TREE__ = message.tree;
         if (window.__SITE_TREE_UPDATE__) window.__SITE_TREE_UPDATE__(message.tree);
       }
     });
