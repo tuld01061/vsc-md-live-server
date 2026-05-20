@@ -43,6 +43,12 @@ export function scanDirectory(rootPath: string, requestPath: string, options: Sc
     if (item.isSymbolicLink()) {
       continue;
     }
+    if (!item.isDirectory()) {
+      const ext = path.extname(item.name).toLowerCase();
+      if (ext !== '.md' && ext !== '.html') {
+        continue;
+      }
+    }
     if (item.isDirectory()) {
       const itemRootPath = path.join(rootPath, item.name);
       const children = scanDirectory(itemRootPath, itemRequestPath, options, visited);

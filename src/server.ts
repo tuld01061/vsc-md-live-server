@@ -70,7 +70,7 @@ export class MarkdownLiveServer {
           this.renderMarkdownFile(filePath),
           path.basename(filePath),
           this.currentPort(),
-          this.siteTree
+          this.siteMenuOptions ? this.siteTree : undefined
         ));
         return;
       }
@@ -79,7 +79,7 @@ export class MarkdownLiveServer {
         response.send(renderHtmlPage(
           fs.readFileSync(filePath, 'utf8'),
           this.currentPort(),
-          this.siteTree
+          this.siteMenuOptions ? this.siteTree : undefined
         ));
         return;
       }
