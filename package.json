@@ -2,7 +2,7 @@
   "name": "md-live-server",
   "displayName": "Markdown Live Server",
   "description": "Preview Markdown, Mermaid diagrams, and static web files with a local live-reload server.",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "publisher": "tuld01061",
   "engines": {
     "vscode": "^1.90.0"
@@ -62,14 +62,23 @@
         },
         "mdLiveServer.siteMenu.include": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["*"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*"
+          ],
           "description": "Patterns for files to include in menu"
         },
         "mdLiveServer.siteMenu.exclude": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": [".*", "node_modules"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".*",
+            "node_modules"
+          ],
           "description": "Patterns for files to exclude from menu"
         }
       }
