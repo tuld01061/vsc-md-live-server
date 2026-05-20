@@ -6,7 +6,8 @@ export function renderMarkdownPage(content: string, title: string, port: number,
   const hasSidebar = siteTree !== undefined && siteTree.length > 0;
 
   const sidebarStyles = hasSidebar ? `
-    #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid var(--border); overflow-y: auto; padding: 1rem; background: var(--bg); z-index: 100; box-sizing: border-box; }
+    #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid var(--border); overflow-y: auto; padding: 1rem; background: var(--bg); z-index: 100; box-sizing: border-box; transition: transform 0.2s; }
+    #site-menu.collapsed { transform: translateX(-260px); }
     #site-menu-search { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.875rem; }
     #site-menu-tree { font-size: 0.875rem; }
     #site-menu-tree ul { list-style: none; padding: 0; margin: 0; }
@@ -15,16 +16,16 @@ export function renderMarkdownPage(content: string, title: string, port: number,
     #site-menu-tree a { text-decoration: none; display: block; padding: 0.15rem 0; color: var(--fg); }
     #site-menu-tree a:hover { color: var(--link); }
     #site-menu-tree a.active { font-weight: bold; color: var(--link); }
-    .hamburger { display: none; position: fixed; top: 1rem; left: 1rem; z-index: 101; background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; color: var(--fg); font-size: 1rem; }
-    @media (max-width: 768px) { #site-menu { transform: translateX(-100%); transition: transform 0.2s; } #site-menu.open { transform: translateX(0); } #content { margin-left: 0; padding: 1rem; } .hamburger { display: block; } }
+    .menu-toggle { position: fixed; top: 1rem; left: 1rem; z-index: 101; background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; color: var(--fg); font-size: 1rem; }
+    @media (max-width: 768px) { body.has-sidebar { padding-left: 0 !important; } #site-menu { transform: translateX(-100%); } #site-menu.open { transform: translateX(0); } #site-menu.collapsed { transform: translateX(-100%); } #content { margin-left: 0; padding: 1rem; } }
   ` : '';
 
   const bodyRule = hasSidebar
-    ? 'body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; color: var(--fg); background: var(--bg); }'
+    ? 'body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; color: var(--fg); background: var(--bg); }\n    body.has-sidebar { padding-left: 260px; }\n    body.has-sidebar.collapsed { padding-left: 0; }'
     : 'body { box-sizing: border-box; max-width: 980px; margin: 0 auto; padding: 2rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; color: var(--fg); background: var(--bg); }';
 
   const contentRule = hasSidebar
-    ? '#content { margin-left: 260px; padding: 2rem; max-width: 980px; }'
+    ? '#content { margin: 0 auto; padding: 2rem; max-width: 980px; }'
     : '';
 
   const sidebarHtml = hasSidebar ? `
@@ -34,7 +35,7 @@ export function renderMarkdownPage(content: string, title: string, port: number,
       </div>
       <div id="site-menu-tree"></div>
     </aside>
-    <button class="hamburger" id="site-menu-toggle" aria-label="Toggle menu">☰</button>
+    <button class="menu-toggle" id="site-menu-toggle" aria-label="Toggle menu">☰</button>
   ` : '';
 
   const sidebarScript = hasSidebar ? `
@@ -153,7 +154,21 @@ export function renderMarkdownPage(content: string, title: string, port: number,
         const menuToggle = document.getElementById('site-menu-toggle');
         const siteMenu = document.getElementById('site-menu');
         if (menuToggle && siteMenu) {
-          menuToggle.addEventListener('click', () => siteMenu.classList.toggle('open'));
+          const collapsedKey = 'md-live-server-menu-collapsed';
+          if (localStorage.getItem(collapsedKey) === 'true') {
+            siteMenu.classList.add('collapsed');
+            document.body.classList.add('collapsed');
+          }
+          menuToggle.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+              siteMenu.classList.toggle('open');
+            } else {
+              const nowCollapsed = !siteMenu.classList.contains('collapsed');
+              siteMenu.classList.toggle('collapsed');
+              document.body.classList.toggle('collapsed');
+              localStorage.setItem(collapsedKey, String(nowCollapsed));
+            }
+          });
         }
       }
 
@@ -352,7 +367,7 @@ export function renderMarkdownPage(content: string, title: string, port: number,
     ${sidebarStyles}
   </style>
 </head>
-<body>
+<body class="has-sidebar">
   <div class="toolbar"><button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">☾</button></div>
   ${sidebarHtml}
   <main id="content">${content}</main>
@@ -396,12 +411,13 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
       </div>
       <div id="site-menu-tree" style="font-size: 0.875rem;"></div>
     </aside>
-    <button id="site-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 101; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; display: none;">☰</button>
+    <button id="site-menu-toggle" aria-label="Toggle menu" style="position: fixed; top: 1rem; left: 1rem; z-index: 101; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer;">☰</button>
   ` : '';
 
   const sidebarScript = hasSidebar ? `
     <style>
-      #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid #d0d7de; overflow-y: auto; padding: 1rem; background: #fff; z-index: 100; box-sizing: border-box; }
+      #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid #d0d7de; overflow-y: auto; padding: 1rem; background: #fff; z-index: 100; box-sizing: border-box; transition: transform 0.2s; }
+      #site-menu.collapsed { transform: translateX(-260px); }
       #site-menu-search { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #d0d7de; border-radius: 4px; margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.875rem; }
       #site-menu-tree { font-size: 0.875rem; }
       #site-menu-tree ul { list-style: none; padding: 0; margin: 0; }
@@ -410,7 +426,9 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
       #site-menu-tree a { text-decoration: none; display: block; padding: 0.15rem 0; color: #24292f; }
       #site-menu-tree a:hover { color: #0969da; }
       #site-menu-tree a.active { font-weight: bold; color: #0969da; }
-      @media (max-width: 768px) { #site-menu { transform: translateX(-100%); transition: transform 0.2s; } #site-menu.open { transform: translateX(0); } #site-menu-toggle { display: block !important; } }
+      body.has-sidebar { padding-left: 260px; }
+      body.has-sidebar.collapsed { padding-left: 0; }
+      @media (max-width: 768px) { body.has-sidebar { padding-left: 0 !important; } #site-menu { transform: translateX(-100%); } #site-menu.open { transform: translateX(0); } #site-menu.collapsed { transform: translateX(-100%); } #site-menu-toggle { display: block !important; } }
     </style>
     <script>
     (function() {
@@ -505,9 +523,26 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
         findAndExpand(currentTree);
         saveExpandedState(expanded);
         refreshSidebar();
+        document.body.classList.add('has-sidebar');
         const menuToggle = document.getElementById('site-menu-toggle');
         const siteMenu = document.getElementById('site-menu');
-        if (menuToggle && siteMenu) menuToggle.addEventListener('click', () => siteMenu.classList.toggle('open'));
+        if (menuToggle && siteMenu) {
+          const collapsedKey = 'md-live-server-menu-collapsed';
+          if (localStorage.getItem(collapsedKey) === 'true') {
+            siteMenu.classList.add('collapsed');
+            document.body.classList.add('collapsed');
+          }
+          menuToggle.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+              siteMenu.classList.toggle('open');
+            } else {
+              const nowCollapsed = !siteMenu.classList.contains('collapsed');
+              siteMenu.classList.toggle('collapsed');
+              document.body.classList.toggle('collapsed');
+              localStorage.setItem(collapsedKey, String(nowCollapsed));
+            }
+          });
+        }
       }
       window.__SITE_TREE_UPDATE__ = (tree) => { currentTree = tree; refreshSidebar(); };
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSidebar);
@@ -586,6 +621,20 @@ export function renderDirectoryPage(requestPath: string, entries: fs.Dirent[]): 
   <ul>${links}</ul>
 </body>
 </html>`;
+}
+
+export function renderDirectoryMarkdownPage(requestPath: string, entries: fs.Dirent[], port: number, siteTree?: TreeNode[]): string {
+  const parentPath = path.posix.dirname(requestPath === '/' ? '' : requestPath);
+  const links = [requestPath !== '/' ? `<li><a href="${escapeAttribute(parentPath || '/')}">..</a></li>` : '']
+    .concat(entries.map((entry) => {
+      const name = `${entry.name}${entry.isDirectory() ? '/' : ''}`;
+      const href = path.posix.join(requestPath, encodeURIComponent(entry.name)) + (entry.isDirectory() ? '/' : '');
+      return `<li><a href="${escapeAttribute(href)}">${escapeHtml(name)}</a></li>`;
+    }))
+    .join('');
+
+  const content = `<h1>${escapeHtml(`Index of ${requestPath}`)}</h1><ul>${links}</ul>`;
+  return renderMarkdownPage(content, `Index of ${requestPath}`, port, siteTree);
 }
 
 function escapeHtml(value: string): string {
