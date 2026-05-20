@@ -13,6 +13,7 @@ let serverState: ServerState = 'stopped';
 let statusBarItem: vscode.StatusBarItem;
 let fileWatcher: vscode.FileSystemWatcher | undefined;
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+let watcherDisposables: vscode.Disposable[] = [];
 
 export function activate(context: vscode.ExtensionContext): void {
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -97,21 +98,23 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
     updateStatusBar();
 
     fileWatcher = vscode.workspace.createFileSystemWatcher('**/*');
-    fileWatcher.onDidCreate((uri) => {
-      if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
-        debouncedRebuildTree();
-      }
-    });
-    fileWatcher.onDidDelete((uri) => {
-      if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
-        debouncedRebuildTree();
-      }
-    });
-    fileWatcher.onDidChange((uri) => {
-      if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
-        debouncedRebuildTree();
-      }
-    });
+    watcherDisposables = [
+      fileWatcher.onDidCreate((uri) => {
+        if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+          debouncedRebuildTree();
+        }
+      }),
+      fileWatcher.onDidDelete((uri) => {
+        if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+          debouncedRebuildTree();
+        }
+      }),
+      fileWatcher.onDidChange((uri) => {
+        if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+          debouncedRebuildTree();
+        }
+      }),
+    ];
   } catch (error) {
     await liveServer?.stop();
     liveServer = undefined;
@@ -145,16 +148,19 @@ async function stopServer(): Promise<void> {
 
   serverState = 'stopping';
   updateStatusBar();
-  await liveServer.stop();
 
   if (debounceTimer) {
     clearTimeout(debounceTimer);
     debounceTimer = undefined;
   }
+  watcherDisposables.forEach(d => d.dispose());
+  watcherDisposables = [];
   if (fileWatcher) {
     fileWatcher.dispose();
     fileWatcher = undefined;
   }
+
+  await liveServer.stop();
 
   liveServer = undefined;
   liveRootPath = undefined;
@@ -169,9 +175,11 @@ function getSiteMenuOptions(): ScanOptions | undefined {
   if (!enabled) {
     return undefined;
   }
+  const include = config.get('include', ['*']);
+  const exclude = config.get('exclude', ['.*', 'node_modules']);
   return {
-    include: config.get('include', ['*']),
-    exclude: config.get('exclude', ['.*', 'node_modules']),
+    include: Array.isArray(include) ? include.filter((item): item is string => typeof item === 'string') : ['*'],
+    exclude: Array.isArray(exclude) ? exclude.filter((item): item is string => typeof item === 'string') : ['.*', 'node_modules'],
   };
 }
 
