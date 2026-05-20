@@ -179,19 +179,23 @@ describe('broadcastTreeUpdate', () => {
 
   it('broadcasts treeUpdate to all WebSocket clients', async () => {
     const client = new WebSocket(`ws://127.0.0.1:${port}`);
-    await new Promise<void>((resolve) => client.once('open', resolve));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        client.once('open', resolve);
+        client.once('error', reject);
+      });
 
-    const messages: unknown[] = [];
-    client.on('message', (data) => messages.push(JSON.parse(String(data))));
+      const messagePromise = new Promise<unknown>((resolve) => {
+        client.once('message', (data) => resolve(JSON.parse(String(data))));
+      });
 
-    server.broadcastTreeUpdate();
+      server.broadcastTreeUpdate();
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(messages.length).toBe(1);
-    expect(messages[0]).toMatchObject({ type: 'treeUpdate' });
-    expect((messages[0] as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
-
-    client.close();
+      const msg = await messagePromise;
+      expect(msg).toMatchObject({ type: 'treeUpdate' });
+      expect((msg as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
+    } finally {
+      client.close();
+    }
   });
 });
