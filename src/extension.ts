@@ -228,13 +228,16 @@ function getEntryPath(resource?: vscode.Uri): string | undefined {
 }
 
 function getRootPath(entryPath: string): string {
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(entryPath));
+  if (workspaceFolder) {
+    return workspaceFolder.uri.fsPath;
+  }
+
   const stat = fs.statSync(entryPath);
   if (stat.isDirectory()) {
     return entryPath;
   }
-
-  const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(entryPath));
-  return workspaceFolder?.uri.fsPath ?? path.dirname(entryPath);
+  return path.dirname(entryPath);
 }
 
 function isInsideRoot(filePath: string, rootPath: string): boolean {
