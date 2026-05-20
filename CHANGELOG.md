@@ -2,6 +2,16 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.1.0
+
+- Added site menu sidebar that auto-scans the workspace for `.md` and `.html` files.
+- Sidebar includes collapsible tree view, search/filter, active file highlighting, and expand-state persistence.
+- Added show/hide toggle button for the sidebar (desktop) and hamburger menu (mobile).
+- Directory index pages now render with the sidebar and live-reload support.
+- Non-Markdown/HTML active files fall back to the parent directory instead of triggering a browser download.
+- Server always serves from the workspace root so the sidebar shows the full project tree.
+- Added VS Code settings for site menu: `mdLiveServer.siteMenu.enabled`, `include`, and `exclude`.
+
 ## 0.0.4
 
 - Fixed server not being exposed to LAN so external devices can access previews.
