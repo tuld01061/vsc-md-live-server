@@ -13,7 +13,14 @@ export interface ScanOptions {
   exclude: string[];
 }
 
-export function scanDirectory(rootPath: string, requestPath: string, options: ScanOptions): TreeNode[] {
+export function scanDirectory(rootPath: string, requestPath: string, options: ScanOptions, visited?: Set<string>): TreeNode[] {
+  const resolvedPath = fs.realpathSync(rootPath);
+  if (visited?.has(resolvedPath)) {
+    return [];
+  }
+  visited = visited ?? new Set<string>();
+  visited.add(resolvedPath);
+
   const entries: TreeNode[] = [];
   let items: fs.Dirent[];
   try {
@@ -33,9 +40,12 @@ export function scanDirectory(rootPath: string, requestPath: string, options: Sc
       ? `/${encodeURIComponent(item.name)}`
       : `${requestPath}/${encodeURIComponent(item.name)}`;
 
+    if (item.isSymbolicLink()) {
+      continue;
+    }
     if (item.isDirectory()) {
       const itemRootPath = path.join(rootPath, item.name);
-      const children = scanDirectory(itemRootPath, itemRequestPath, options);
+      const children = scanDirectory(itemRootPath, itemRequestPath, options, visited);
       entries.push({ name: item.name, path: itemRequestPath + '/', type: 'directory', children });
     } else {
       entries.push({ name: item.name, path: itemRequestPath, type: 'file' });

@@ -38,11 +38,33 @@ describe('scanDirectory', () => {
   });
 
   it('sorts directories before files alphabetically', () => {
-    fs.writeFileSync(path.join(tmpDir, 'aaa.md'), '# A');
-    const tree = scanDirectory(tmpDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
-    expect(tree[0].type).toBe('directory');
-    expect(tree[1].name).toBe('aaa.md');
-    fs.unlinkSync(path.join(tmpDir, 'aaa.md'));
+    const filePath = path.join(tmpDir, 'aaa.md');
+    fs.writeFileSync(filePath, '# A');
+    try {
+      const tree = scanDirectory(tmpDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
+      expect(tree[0].type).toBe('directory');
+      expect(tree[1].name).toBe('aaa.md');
+    } finally {
+      fs.unlinkSync(filePath);
+    }
+  });
+
+  it('returns empty array for empty directory', () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-empty-'));
+    const tree = scanDirectory(emptyDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
+    expect(tree).toEqual([]);
+    fs.rmSync(emptyDir, { recursive: true, force: true });
+  });
+
+  it('handles symlinks gracefully', () => {
+    const linkDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-link-'));
+    fs.mkdirSync(path.join(linkDir, 'docs'));
+    fs.writeFileSync(path.join(linkDir, 'docs', 'guide.md'), '# Guide');
+    // Create a symlink pointing back to parent (would loop)
+    fs.symlinkSync(linkDir, path.join(linkDir, 'loop'));
+    const tree = scanDirectory(linkDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
+    expect(tree.find(n => n.name === 'loop')).toBeUndefined();
+    fs.rmSync(linkDir, { recursive: true, force: true });
   });
 });
 
