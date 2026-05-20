@@ -150,7 +150,7 @@ export class MarkdownLiveServer {
         return;
       }
       const clientPath = this.clientPaths.get(client);
-      if (isMarkdown && clientPath && clientPath !== requestPath) {
+      if (isMarkdown && clientPath && clientPath !== decodeURIComponent(requestPath)) {
         return;
       }
       client.send(payload);

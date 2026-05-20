@@ -41,7 +41,7 @@ export function renderMarkdownPage(content: string, title: string, port: number,
     <script>
     (function() {
       const TREE_STATE_KEY = 'md-live-server-tree-state';
-      let currentTree = ${JSON.stringify(siteTree)};
+      let currentTree = ${JSON.stringify(siteTree).replace(/</g, '\\u003c')};
 
       function loadExpandedState() {
         try { return new Set(JSON.parse(localStorage.getItem(TREE_STATE_KEY) || '[]')); }
@@ -414,7 +414,7 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
     </style>
     <script>
     (function() {
-      let currentTree = ${JSON.stringify(siteTree)};
+      let currentTree = ${JSON.stringify(siteTree).replace(/</g, '\\u003c')};
       function loadExpandedState() {
         try { return new Set(JSON.parse(localStorage.getItem('md-live-server-tree-state') || '[]')); }
         catch { return new Set(); }
@@ -516,6 +516,9 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
     </script>
     <script>
     const socket = new WebSocket('ws://127.0.0.1:${port}');
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
+    });
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.type === 'reload') { location.reload(); }
