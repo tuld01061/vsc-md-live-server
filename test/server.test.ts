@@ -14,7 +14,7 @@ describe('resolveRequestPath', () => {
     fs.writeFileSync(path.join(tmpDir, 'readme.md'), '# Hello');
     fs.mkdirSync(path.join(tmpDir, 'sub'));
     fs.writeFileSync(path.join(tmpDir, 'sub', 'nested.md'), '# Nested');
-    server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'readme.md') });
+    server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'readme.md'), siteMenu: { enabled: true, include: ['*'], exclude: ['.*'] } });
   });
 
   afterAll(() => {
@@ -64,6 +64,13 @@ describe('resolveRequestPath', () => {
       fs.unlinkSync(outsideFile);
     }
   });
+
+  it('builds site tree on start', () => {
+    server['rebuildSiteTree']();
+    expect(server['siteTree']).toBeDefined();
+    expect(server['siteTree'].length).toBeGreaterThan(0);
+    expect(server['siteTree'].some(n => n.name === 'readme.md')).toBe(true);
+  });
 });
 
 describe('broadcastChange', () => {
@@ -87,64 +94,118 @@ describe('broadcastChange', () => {
   it('sends markdown update only to client subscribed to that file', async () => {
     const clientA = new WebSocket(`ws://127.0.0.1:${port}`);
     const clientB = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await Promise.all([
+        new Promise<void>((resolve) => clientA.once('open', resolve)),
+        new Promise<void>((resolve) => clientB.once('open', resolve)),
+      ]);
 
-    await Promise.all([
-      new Promise<void>((resolve) => clientA.once('open', resolve)),
-      new Promise<void>((resolve) => clientB.once('open', resolve)),
-    ]);
+      clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
+      clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
 
-    clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
-    clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
+      // small delay for message processing
+      await new Promise((r) => setTimeout(r, 50));
 
-    // small delay for message processing
-    await new Promise((r) => setTimeout(r, 50));
+      const messagesA: unknown[] = [];
+      const messagesB: unknown[] = [];
+      clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
+      clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
 
-    const messagesA: unknown[] = [];
-    const messagesB: unknown[] = [];
-    clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
-    clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
+      server.broadcastChange(path.join(tmpDir, 'a.md'));
 
-    server.broadcastChange(path.join(tmpDir, 'a.md'));
+      await new Promise((r) => setTimeout(r, 50));
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(messagesA.length).toBe(1);
-    expect(messagesA[0]).toMatchObject({ type: 'markdown' });
-    expect(messagesB.length).toBe(0);
-
-    clientA.close();
-    clientB.close();
+      expect(messagesA.length).toBe(1);
+      expect(messagesA[0]).toMatchObject({ type: 'markdown' });
+      expect(messagesB.length).toBe(0);
+    } finally {
+      clientA.close();
+      clientB.close();
+    }
   });
 
   it('sends reload to all clients regardless of subscription', async () => {
     const clientA = new WebSocket(`ws://127.0.0.1:${port}`);
     const clientB = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await Promise.all([
+        new Promise<void>((resolve) => clientA.once('open', resolve)),
+        new Promise<void>((resolve) => clientB.once('open', resolve)),
+      ]);
 
-    await Promise.all([
-      new Promise<void>((resolve) => clientA.once('open', resolve)),
-      new Promise<void>((resolve) => clientB.once('open', resolve)),
-    ]);
+      clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
+      clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
 
-    clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
-    clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
+      await new Promise((r) => setTimeout(r, 50));
 
-    await new Promise((r) => setTimeout(r, 50));
+      const messagesA: unknown[] = [];
+      const messagesB: unknown[] = [];
+      clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
+      clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
 
-    const messagesA: unknown[] = [];
-    const messagesB: unknown[] = [];
-    clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
-    clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
+      server.broadcastChange(path.join(tmpDir, 'page.html'));
 
-    server.broadcastChange(path.join(tmpDir, 'page.html'));
+      await new Promise((r) => setTimeout(r, 50));
 
-    await new Promise((r) => setTimeout(r, 50));
+      expect(messagesA.length).toBe(1);
+      expect(messagesA[0]).toEqual({ type: 'reload' });
+      expect(messagesB.length).toBe(1);
+      expect(messagesB[0]).toEqual({ type: 'reload' });
+    } finally {
+      clientA.close();
+      clientB.close();
+    }
+  });
+});
 
-    expect(messagesA.length).toBe(1);
-    expect(messagesA[0]).toEqual({ type: 'reload' });
-    expect(messagesB.length).toBe(1);
-    expect(messagesB[0]).toEqual({ type: 'reload' });
+describe('broadcastTreeUpdate', () => {
+  let tmpDir: string;
+  let server: MarkdownLiveServer;
+  let port: number;
 
-    clientA.close();
-    clientB.close();
+  beforeAll(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-tree-broadcast-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.md'), '# A');
+    server = new MarkdownLiveServer({
+      rootPath: tmpDir,
+      entryPath: path.join(tmpDir, 'a.md'),
+      siteMenu: { enabled: true, include: ['*'], exclude: ['.*'] }
+    });
+    port = await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('broadcasts treeUpdate to all WebSocket clients', async () => {
+    const client = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        client.once('open', resolve);
+        client.once('error', reject);
+      });
+
+      const messages: unknown[] = [];
+      client.on('message', (data) => messages.push(JSON.parse(String(data))));
+
+      server.broadcastTreeUpdate();
+
+      // Wait for message to arrive
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (messages.length > 0) resolve();
+          else setTimeout(check, 10);
+        };
+        check();
+      });
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toMatchObject({ type: 'treeUpdate' });
+      expect((messages[0] as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
+    } finally {
+      client.close();
+    }
   });
 });

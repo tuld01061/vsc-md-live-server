@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { MarkdownLiveServer } from './server';
+import type { ScanOptions } from './tree';
 
 type ServerState = 'stopped' | 'starting' | 'started' | 'stopping';
 
@@ -10,6 +11,9 @@ let liveRootPath: string | undefined;
 let livePort: number | undefined;
 let serverState: ServerState = 'stopped';
 let statusBarItem: vscode.StatusBarItem;
+let fileWatcher: vscode.FileSystemWatcher | undefined;
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+let watcherDisposables: vscode.Disposable[] = [];
 
 export function activate(context: vscode.ExtensionContext): void {
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -83,7 +87,8 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
   }
 
   liveRootPath = rootPath;
-  liveServer = new MarkdownLiveServer({ rootPath, entryPath });
+  const siteMenuOptions = getSiteMenuOptions();
+  liveServer = new MarkdownLiveServer({ rootPath, entryPath, siteMenu: siteMenuOptions });
   serverState = 'starting';
   updateStatusBar();
 
@@ -91,6 +96,25 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
     livePort = await liveServer.start();
     serverState = 'started';
     updateStatusBar();
+
+    fileWatcher = vscode.workspace.createFileSystemWatcher('**/*');
+    watcherDisposables = [
+      fileWatcher.onDidCreate((uri) => {
+        if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+          debouncedRebuildTree();
+        }
+      }),
+      fileWatcher.onDidDelete((uri) => {
+        if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+          debouncedRebuildTree();
+        }
+      }),
+      fileWatcher.onDidChange((uri) => {
+        if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+          debouncedRebuildTree();
+        }
+      }),
+    ];
   } catch (error) {
     await liveServer?.stop();
     liveServer = undefined;
@@ -124,7 +148,20 @@ async function stopServer(): Promise<void> {
 
   serverState = 'stopping';
   updateStatusBar();
+
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = undefined;
+  }
+  watcherDisposables.forEach(d => d.dispose());
+  watcherDisposables = [];
+  if (fileWatcher) {
+    fileWatcher.dispose();
+    fileWatcher = undefined;
+  }
+
   await liveServer.stop();
+
   liveServer = undefined;
   liveRootPath = undefined;
   livePort = undefined;
@@ -132,27 +169,75 @@ async function stopServer(): Promise<void> {
   updateStatusBar();
 }
 
+function getSiteMenuOptions(): ScanOptions | undefined {
+  const config = vscode.workspace.getConfiguration('mdLiveServer.siteMenu');
+  const enabled = config.get('enabled', true);
+  if (!enabled) {
+    return undefined;
+  }
+  const include = config.get('include', ['*']);
+  const exclude = config.get('exclude', ['.*', 'node_modules']);
+  return {
+    include: Array.isArray(include) ? include.filter((item): item is string => typeof item === 'string') : ['*'],
+    exclude: Array.isArray(exclude) ? exclude.filter((item): item is string => typeof item === 'string') : ['.*', 'node_modules'],
+  };
+}
+
+function debouncedRebuildTree() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(() => {
+    if (liveServer && liveRootPath) {
+      liveServer.rebuildSiteTree();
+      liveServer.broadcastTreeUpdate();
+    }
+  }, 300);
+}
+
+function isSupportedFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return ext === '.md' || ext === '.html';
+}
+
 function getEntryPath(resource?: vscode.Uri): string | undefined {
   if (resource?.scheme === 'file') {
-    return resource.fsPath;
+    if (isSupportedFile(resource.fsPath)) {
+      return resource.fsPath;
+    }
+    try {
+      const stat = fs.statSync(resource.fsPath);
+      if (stat.isDirectory()) {
+        return resource.fsPath;
+      }
+    } catch {
+      // fall through to parent directory
+    }
+    return path.dirname(resource.fsPath);
   }
 
   const activeDocument = vscode.window.activeTextEditor?.document;
   if (activeDocument?.uri.scheme === 'file') {
-    return activeDocument.uri.fsPath;
+    if (isSupportedFile(activeDocument.uri.fsPath)) {
+      return activeDocument.uri.fsPath;
+    }
+    return path.dirname(activeDocument.uri.fsPath);
   }
 
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
 function getRootPath(entryPath: string): string {
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(entryPath));
+  if (workspaceFolder) {
+    return workspaceFolder.uri.fsPath;
+  }
+
   const stat = fs.statSync(entryPath);
   if (stat.isDirectory()) {
     return entryPath;
   }
-
-  const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(entryPath));
-  return workspaceFolder?.uri.fsPath ?? path.dirname(entryPath);
+  return path.dirname(entryPath);
 }
 
 function isInsideRoot(filePath: string, rootPath: string): boolean {

@@ -6,12 +6,14 @@ import * as path from 'path';
 import express from 'express';
 import MarkdownIt from 'markdown-it';
 import { WebSocketServer, WebSocket } from 'ws';
-import { renderDirectoryPage, renderHtmlPage, renderMarkdownPage } from './template';
+import { renderDirectoryMarkdownPage, renderHtmlPage, renderMarkdownPage } from './template';
+import { scanDirectory, TreeNode, ScanOptions } from './tree';
 
 export interface MarkdownLiveServerOptions {
   port?: number;
   rootPath: string;
   entryPath: string;
+  siteMenu?: ScanOptions;
 }
 
 interface ReloadMessage {
@@ -33,12 +35,15 @@ export class MarkdownLiveServer {
   private readonly clientPaths = new WeakMap<WebSocket, string>();
   private httpServer?: http.Server;
   private webSocketServer?: WebSocketServer;
+  private siteTree: TreeNode[] = [];
+  private readonly siteMenuOptions?: ScanOptions;
 
   constructor(options: MarkdownLiveServerOptions) {
     this.port = options.port ?? 0;
     this.rootPath = options.rootPath;
     this.rootRealPath = fs.realpathSync(options.rootPath);
     this.entryPath = options.entryPath;
+    this.siteMenuOptions = options.siteMenu;
   }
 
   async start(): Promise<number> {
@@ -56,17 +61,31 @@ export class MarkdownLiveServer {
       }
 
       if (fs.statSync(filePath).isDirectory()) {
-        response.send(renderDirectoryPage(request.path, fs.readdirSync(filePath, { withFileTypes: true })));
+        response.send(renderDirectoryMarkdownPage(
+          request.path,
+          fs.readdirSync(filePath, { withFileTypes: true }),
+          this.currentPort(),
+          this.siteMenuOptions ? this.siteTree : undefined
+        ));
         return;
       }
 
       if (path.extname(filePath).toLowerCase() === '.md') {
-        response.send(renderMarkdownPage(this.renderMarkdownFile(filePath), path.basename(filePath), this.currentPort()));
+        response.send(renderMarkdownPage(
+          this.renderMarkdownFile(filePath),
+          path.basename(filePath),
+          this.currentPort(),
+          this.siteMenuOptions ? this.siteTree : undefined
+        ));
         return;
       }
 
       if (path.extname(filePath).toLowerCase() === '.html') {
-        response.send(renderHtmlPage(fs.readFileSync(filePath, 'utf8'), this.currentPort()));
+        response.send(renderHtmlPage(
+          fs.readFileSync(filePath, 'utf8'),
+          this.currentPort(),
+          this.siteMenuOptions ? this.siteTree : undefined
+        ));
         return;
       }
 
@@ -98,6 +117,8 @@ export class MarkdownLiveServer {
       this.httpServer?.once('error', reject);
       this.httpServer?.listen(this.port, '0.0.0.0', () => resolve());
     });
+
+    this.rebuildSiteTree();
 
     return this.currentPort();
   }
@@ -134,10 +155,27 @@ export class MarkdownLiveServer {
         return;
       }
       const clientPath = this.clientPaths.get(client);
-      if (isMarkdown && clientPath && clientPath !== requestPath) {
+      if (isMarkdown && clientPath && clientPath !== decodeURIComponent(requestPath)) {
         return;
       }
       client.send(payload);
+    });
+  }
+
+  rebuildSiteTree(): void {
+    if (!this.siteMenuOptions) {
+      this.siteTree = [];
+      return;
+    }
+    this.siteTree = scanDirectory(this.rootPath, '/', this.siteMenuOptions);
+  }
+
+  broadcastTreeUpdate(): void {
+    const payload = JSON.stringify({ type: 'treeUpdate', tree: this.siteTree });
+    this.webSocketServer?.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
     });
   }
 
