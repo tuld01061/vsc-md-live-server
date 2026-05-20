@@ -1,7 +1,221 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import type { TreeNode } from './tree';
 
-export function renderMarkdownPage(content: string, title: string, port: number): string {
+export function renderMarkdownPage(content: string, title: string, port: number, siteTree?: TreeNode[]): string {
+  const hasSidebar = siteTree !== undefined;
+
+  const sidebarStyles = hasSidebar ? `
+    #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid var(--border); overflow-y: auto; padding: 1rem; background: var(--bg); z-index: 100; box-sizing: border-box; }
+    #site-menu-search { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.875rem; }
+    #site-menu-tree { font-size: 0.875rem; }
+    #site-menu-tree ul { list-style: none; padding: 0; margin: 0; }
+    #site-menu-tree ul ul { padding-left: 0.75rem; }
+    #site-menu-tree li { margin: 0.15rem 0; }
+    #site-menu-tree a { text-decoration: none; display: block; padding: 0.15rem 0; color: var(--fg); }
+    #site-menu-tree a:hover { color: var(--link); }
+    #site-menu-tree a.active { font-weight: bold; color: var(--link); }
+    .hamburger { display: none; position: fixed; top: 1rem; left: 1rem; z-index: 101; background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; color: var(--fg); font-size: 1rem; }
+    @media (max-width: 768px) { #site-menu { transform: translateX(-100%); transition: transform 0.2s; } #site-menu.open { transform: translateX(0); } #content { margin-left: 0; padding: 1rem; } .hamburger { display: block; } }
+  ` : '';
+
+  const bodyRule = hasSidebar
+    ? 'body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; color: var(--fg); background: var(--bg); }'
+    : 'body { box-sizing: border-box; max-width: 980px; margin: 0 auto; padding: 2rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; color: var(--fg); background: var(--bg); }';
+
+  const contentRule = hasSidebar
+    ? '#content { margin-left: 260px; padding: 2rem; max-width: 980px; }'
+    : '';
+
+  const sidebarHtml = hasSidebar ? `
+    <aside id="site-menu">
+      <div style="margin-top: 2.5rem;">
+        <input type="text" id="site-menu-search" placeholder="Search files..." autocomplete="off">
+      </div>
+      <div id="site-menu-tree"></div>
+    </aside>
+    <button class="hamburger" id="site-menu-toggle" aria-label="Toggle menu">☰</button>
+  ` : '';
+
+  const sidebarScript = hasSidebar ? `
+    <script>
+    (function() {
+      const TREE_STATE_KEY = 'md-live-server-tree-state';
+      let currentTree = ${JSON.stringify(siteTree)};
+
+      function loadExpandedState() {
+        try { return new Set(JSON.parse(localStorage.getItem(TREE_STATE_KEY) || '[]')); }
+        catch { return new Set(); }
+      }
+
+      function saveExpandedState(expanded) {
+        localStorage.setItem(TREE_STATE_KEY, JSON.stringify([...expanded]));
+      }
+
+      function shouldShowNode(node, query) {
+        if (!query) return true;
+        if (node.name.toLowerCase().includes(query)) return true;
+        if (node.type === 'directory' && node.children) {
+          return node.children.some(child => shouldShowNode(child, query));
+        }
+        return false;
+      }
+
+      function renderTree(nodes, expanded, container, depth, query) {
+        if (!nodes || nodes.length === 0) return;
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.paddingLeft = depth === 0 ? '0' : '0.75rem';
+        ul.style.margin = '0';
+
+        for (const node of nodes) {
+          if (!shouldShowNode(node, query)) continue;
+          const li = document.createElement('li');
+          li.style.margin = '0.15rem 0';
+
+          if (node.type === 'directory') {
+            const isExpanded = expanded.has(node.path) || !!query;
+            const toggle = document.createElement('span');
+            toggle.textContent = isExpanded ? '▼ ' : '▶ ';
+            toggle.style.cursor = 'pointer';
+            toggle.style.userSelect = 'none';
+            toggle.style.color = 'var(--muted)';
+            toggle.style.fontSize = '0.75rem';
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = node.name;
+            nameSpan.style.cursor = 'pointer';
+
+            const folderDiv = document.createElement('div');
+            folderDiv.appendChild(toggle);
+            folderDiv.appendChild(nameSpan);
+            li.appendChild(folderDiv);
+
+            if (node.children && isExpanded) {
+              renderTree(node.children, expanded, li, depth + 1, query);
+            }
+
+            const toggleHandler = (e) => {
+              e.preventDefault();
+              if (expanded.has(node.path)) expanded.delete(node.path);
+              else expanded.add(node.path);
+              saveExpandedState(expanded);
+              refreshSidebar();
+            };
+            toggle.addEventListener('click', toggleHandler);
+            nameSpan.addEventListener('click', toggleHandler);
+          } else {
+            const link = document.createElement('a');
+            link.href = node.path;
+            link.textContent = node.name;
+            link.style.textDecoration = 'none';
+            link.style.display = 'block';
+            if (node.path === location.pathname) link.className = 'active';
+            li.appendChild(link);
+          }
+          ul.appendChild(li);
+        }
+        if (ul.children.length > 0) container.appendChild(ul);
+      }
+
+      function refreshSidebar() {
+        const sidebar = document.getElementById('site-menu-tree');
+        if (!sidebar) return;
+        sidebar.innerHTML = '';
+        const expanded = loadExpandedState();
+        const query = document.getElementById('site-menu-search')?.value.toLowerCase() || '';
+        renderTree(currentTree, expanded, sidebar, 0, query);
+      }
+
+      function initSidebar() {
+        const searchInput = document.getElementById('site-menu-search');
+        if (searchInput) searchInput.addEventListener('input', refreshSidebar);
+
+        const expanded = loadExpandedState();
+        const activePath = location.pathname;
+        function findAndExpand(nodes) {
+          for (const node of nodes) {
+            if (node.type === 'directory' && node.children) {
+              for (const child of node.children) {
+                if (child.path === activePath) { expanded.add(node.path); return true; }
+                if (child.type === 'directory' && findAndExpand([child])) {
+                  expanded.add(node.path); return true;
+                }
+              }
+            }
+          }
+          return false;
+        }
+        findAndExpand(currentTree);
+        saveExpandedState(expanded);
+        refreshSidebar();
+
+        const menuToggle = document.getElementById('site-menu-toggle');
+        const siteMenu = document.getElementById('site-menu');
+        if (menuToggle && siteMenu) {
+          menuToggle.addEventListener('click', () => siteMenu.classList.toggle('open'));
+        }
+      }
+
+      window.__SITE_TREE_UPDATE__ = (tree) => { currentTree = tree; refreshSidebar(); };
+
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSidebar);
+      else initSidebar();
+    })();
+    </script>
+  ` : '';
+
+  const wsScript = hasSidebar ? `
+    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
+    });
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'reload') {
+        location.reload();
+        return;
+      }
+      if (message.type === 'treeUpdate') {
+        window.__SITE_TREE__ = message.tree;
+        if (window.__SITE_TREE_UPDATE__) window.__SITE_TREE_UPDATE__(message.tree);
+        return;
+      }
+      const contentDiv = document.getElementById('content');
+      contentDiv.innerHTML = message.content;
+      contentDiv.querySelectorAll('script').forEach((oldScript) => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+        newScript.textContent = oldScript.textContent;
+        oldScript.replaceWith(newScript);
+      });
+      window.renderMermaid?.();
+      window.highlightCode?.();
+    });
+  ` : `
+    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
+    });
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'reload') {
+        location.reload();
+        return;
+      }
+      const contentDiv = document.getElementById('content');
+      contentDiv.innerHTML = message.content;
+      contentDiv.querySelectorAll('script').forEach((oldScript) => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
+        newScript.textContent = oldScript.textContent;
+        oldScript.replaceWith(newScript);
+      });
+      window.renderMermaid?.();
+      window.highlightCode?.();
+    });
+  `;
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -93,16 +307,7 @@ export function renderMarkdownPage(content: string, title: string, port: number)
       --code-bg: #161b22;
       --link: #58a6ff;
     }
-    body {
-      box-sizing: border-box;
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.6;
-      color: var(--fg);
-      background: var(--bg);
-    }
+    ${bodyRule}
     a { color: var(--link); }
     pre {
       overflow: auto;
@@ -129,6 +334,7 @@ export function renderMarkdownPage(content: string, title: string, port: number)
       position: fixed;
       top: 1rem;
       right: 1rem;
+      z-index: 50;
     }
     .toolbar button {
       display: inline-grid;
@@ -143,11 +349,15 @@ export function renderMarkdownPage(content: string, title: string, port: number)
       cursor: pointer;
       font-size: 1rem;
     }
+    ${contentRule}
+    ${sidebarStyles}
   </style>
 </head>
 <body>
   <div class="toolbar"><button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">☾</button></div>
+  ${sidebarHtml}
   <main id="content">${content}</main>
+  ${sidebarScript}
   <script>
     const savedTheme = localStorage.getItem('md-live-server-theme');
     const preferredTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -171,33 +381,157 @@ export function renderMarkdownPage(content: string, title: string, port: number)
       location.reload();
     });
 
-    const socket = new WebSocket('ws://127.0.0.1:${port}');
-    socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
-    });
-    socket.addEventListener('message', (event) => {
-      const message = JSON.parse(event.data);
-      if (message.type === 'reload') {
-        location.reload();
-        return;
-      }
-      const contentDiv = document.getElementById('content');
-      contentDiv.innerHTML = message.content;
-      contentDiv.querySelectorAll('script').forEach((oldScript) => {
-        const newScript = document.createElement('script');
-        Array.from(oldScript.attributes).forEach((attr) => newScript.setAttribute(attr.name, attr.value));
-        newScript.textContent = oldScript.textContent;
-        oldScript.replaceWith(newScript);
-      });
-      window.renderMermaid?.();
-      window.highlightCode?.();
-    });
+    ${wsScript}
   </script>
 </body>
 </html>`;
 }
 
-export function renderHtmlPage(content: string, port: number): string {
+export function renderHtmlPage(content: string, port: number, siteTree?: TreeNode[]): string {
+  const hasSidebar = siteTree !== undefined;
+
+  const sidebarHtml = hasSidebar ? `
+    <aside id="site-menu" style="position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid #d0d7de; overflow-y: auto; padding: 1rem; background: #fff; z-index: 100; box-sizing: border-box;">
+      <div style="margin-top: 2.5rem;">
+        <input type="text" id="site-menu-search" placeholder="Search files..." style="width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #d0d7de; border-radius: 4px; margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.875rem;">
+      </div>
+      <div id="site-menu-tree" style="font-size: 0.875rem;"></div>
+    </aside>
+    <button id="site-menu-toggle" style="position: fixed; top: 1rem; left: 1rem; z-index: 101; background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 0.4rem 0.6rem; cursor: pointer; display: none;">☰</button>
+    <div style="margin-left: 260px; padding: 2rem;">
+  ` : '';
+
+  const sidebarScript = hasSidebar ? `
+    <script>
+    (function() {
+      let currentTree = ${JSON.stringify(siteTree)};
+      function loadExpandedState() {
+        try { return new Set(JSON.parse(localStorage.getItem('md-live-server-tree-state') || '[]')); }
+        catch { return new Set(); }
+      }
+      function saveExpandedState(expanded) {
+        localStorage.setItem('md-live-server-tree-state', JSON.stringify([...expanded]));
+      }
+      function shouldShowNode(node, query) {
+        if (!query) return true;
+        if (node.name.toLowerCase().includes(query)) return true;
+        if (node.type === 'directory' && node.children) {
+          return node.children.some(child => shouldShowNode(child, query));
+        }
+        return false;
+      }
+      function renderTree(nodes, expanded, container, depth, query) {
+        if (!nodes || nodes.length === 0) return;
+        const ul = document.createElement('ul');
+        ul.style.listStyle = 'none';
+        ul.style.paddingLeft = depth === 0 ? '0' : '0.75rem';
+        ul.style.margin = '0';
+        for (const node of nodes) {
+          if (!shouldShowNode(node, query)) continue;
+          const li = document.createElement('li');
+          li.style.margin = '0.15rem 0';
+          if (node.type === 'directory') {
+            const isExpanded = expanded.has(node.path) || !!query;
+            const toggle = document.createElement('span');
+            toggle.textContent = isExpanded ? '▼ ' : '▶ ';
+            toggle.style.cursor = 'pointer';
+            toggle.style.userSelect = 'none';
+            toggle.style.color = '#57606a';
+            toggle.style.fontSize = '0.75rem';
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = node.name;
+            nameSpan.style.cursor = 'pointer';
+            const folderDiv = document.createElement('div');
+            folderDiv.appendChild(toggle);
+            folderDiv.appendChild(nameSpan);
+            li.appendChild(folderDiv);
+            if (node.children && isExpanded) renderTree(node.children, expanded, li, depth + 1, query);
+            const toggleHandler = (e) => {
+              e.preventDefault();
+              if (expanded.has(node.path)) expanded.delete(node.path);
+              else expanded.add(node.path);
+              saveExpandedState(expanded);
+              refreshSidebar();
+            };
+            toggle.addEventListener('click', toggleHandler);
+            nameSpan.addEventListener('click', toggleHandler);
+          } else {
+            const link = document.createElement('a');
+            link.href = node.path;
+            link.textContent = node.name;
+            link.style.textDecoration = 'none';
+            link.style.display = 'block';
+            if (node.path === location.pathname) link.style.fontWeight = 'bold';
+            li.appendChild(link);
+          }
+          ul.appendChild(li);
+        }
+        if (ul.children.length > 0) container.appendChild(ul);
+      }
+      function refreshSidebar() {
+        const sidebar = document.getElementById('site-menu-tree');
+        if (!sidebar) return;
+        sidebar.innerHTML = '';
+        const expanded = loadExpandedState();
+        const query = document.getElementById('site-menu-search')?.value.toLowerCase() || '';
+        renderTree(currentTree, expanded, sidebar, 0, query);
+      }
+      function initSidebar() {
+        const searchInput = document.getElementById('site-menu-search');
+        if (searchInput) searchInput.addEventListener('input', refreshSidebar);
+        const expanded = loadExpandedState();
+        const activePath = location.pathname;
+        function findAndExpand(nodes) {
+          for (const node of nodes) {
+            if (node.type === 'directory' && node.children) {
+              for (const child of node.children) {
+                if (child.path === activePath) { expanded.add(node.path); return true; }
+                if (child.type === 'directory' && findAndExpand([child])) { expanded.add(node.path); return true; }
+              }
+            }
+          }
+          return false;
+        }
+        findAndExpand(currentTree);
+        saveExpandedState(expanded);
+        refreshSidebar();
+        const menuToggle = document.getElementById('site-menu-toggle');
+        const siteMenu = document.getElementById('site-menu');
+        if (menuToggle && siteMenu) menuToggle.addEventListener('click', () => siteMenu.classList.toggle('open'));
+      }
+      window.__SITE_TREE_UPDATE__ = (tree) => { currentTree = tree; refreshSidebar(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSidebar);
+      else initSidebar();
+    })();
+    </script>
+    <script>
+    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'reload') { location.reload(); }
+      if (message.type === 'treeUpdate') {
+        window.__SITE_TREE__ = message.tree;
+        if (window.__SITE_TREE_UPDATE__) window.__SITE_TREE_UPDATE__(message.tree);
+      }
+    });
+    </script>
+  ` : `
+    <script>
+    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    socket.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'reload') { location.reload(); }
+    });
+    </script>
+  `;
+
+  if (hasSidebar) {
+    if (/<\/body>/i.test(content)) {
+      return content.replace(/<\/body>/i, sidebarHtml + '\n' + sidebarScript + '\n</body>');
+    }
+    return content + '\n' + sidebarHtml + '\n' + sidebarScript;
+  }
+
   const script = `<script>
   const socket = new WebSocket('ws://127.0.0.1:${port}');
   socket.addEventListener('message', (event) => {
