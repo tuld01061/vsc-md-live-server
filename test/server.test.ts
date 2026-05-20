@@ -14,7 +14,7 @@ describe('resolveRequestPath', () => {
     fs.writeFileSync(path.join(tmpDir, 'readme.md'), '# Hello');
     fs.mkdirSync(path.join(tmpDir, 'sub'));
     fs.writeFileSync(path.join(tmpDir, 'sub', 'nested.md'), '# Nested');
-    server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'readme.md') });
+    server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'readme.md'), siteMenu: { enabled: true, include: ['*'], exclude: ['.*'] } });
   });
 
   afterAll(() => {
@@ -63,6 +63,13 @@ describe('resolveRequestPath', () => {
       fs.unlinkSync(linkPath);
       fs.unlinkSync(outsideFile);
     }
+  });
+
+  it('builds site tree on start', () => {
+    server['rebuildSiteTree']();
+    expect(server['siteTree']).toBeDefined();
+    expect(server['siteTree'].length).toBeGreaterThan(0);
+    expect(server['siteTree'].some(n => n.name === 'readme.md')).toBe(true);
   });
 });
 
@@ -146,5 +153,45 @@ describe('broadcastChange', () => {
 
     clientA.close();
     clientB.close();
+  });
+});
+
+describe('broadcastTreeUpdate', () => {
+  let tmpDir: string;
+  let server: MarkdownLiveServer;
+  let port: number;
+
+  beforeAll(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-tree-broadcast-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.md'), '# A');
+    server = new MarkdownLiveServer({
+      rootPath: tmpDir,
+      entryPath: path.join(tmpDir, 'a.md'),
+      siteMenu: { enabled: true, include: ['*'], exclude: ['.*'] }
+    });
+    port = await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('broadcasts treeUpdate to all WebSocket clients', async () => {
+    const client = new WebSocket(`ws://127.0.0.1:${port}`);
+    await new Promise<void>((resolve) => client.once('open', resolve));
+
+    const messages: unknown[] = [];
+    client.on('message', (data) => messages.push(JSON.parse(String(data))));
+
+    server.broadcastTreeUpdate();
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(messages.length).toBe(1);
+    expect(messages[0]).toMatchObject({ type: 'treeUpdate' });
+    expect((messages[0] as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
+
+    client.close();
   });
 });
