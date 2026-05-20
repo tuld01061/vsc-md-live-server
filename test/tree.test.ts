@@ -51,9 +51,12 @@ describe('scanDirectory', () => {
 
   it('returns empty array for empty directory', () => {
     const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-empty-'));
-    const tree = scanDirectory(emptyDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
-    expect(tree).toEqual([]);
-    fs.rmSync(emptyDir, { recursive: true, force: true });
+    try {
+      const tree = scanDirectory(emptyDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
+      expect(tree).toEqual([]);
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
   });
 
   it('handles symlinks gracefully', () => {
@@ -62,9 +65,12 @@ describe('scanDirectory', () => {
     fs.writeFileSync(path.join(linkDir, 'docs', 'guide.md'), '# Guide');
     // Create a symlink pointing back to parent (would loop)
     fs.symlinkSync(linkDir, path.join(linkDir, 'loop'));
-    const tree = scanDirectory(linkDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
-    expect(tree.find(n => n.name === 'loop')).toBeUndefined();
-    fs.rmSync(linkDir, { recursive: true, force: true });
+    try {
+      const tree = scanDirectory(linkDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
+      expect(tree.find(n => n.name === 'loop')).toBeUndefined();
+    } finally {
+      fs.rmSync(linkDir, { recursive: true, force: true });
+    }
   });
 });
 
