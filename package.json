@@ -51,6 +51,28 @@
           "group": "navigation@100"
         }
       ]
+    },
+    "configuration": {
+      "title": "Markdown Live Server",
+      "properties": {
+        "mdLiveServer.siteMenu.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable site menu sidebar"
+        },
+        "mdLiveServer.siteMenu.include": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["*"],
+          "description": "Patterns for files to include in menu"
+        },
+        "mdLiveServer.siteMenu.exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".*", "node_modules"],
+          "description": "Patterns for files to exclude from menu"
+        }
+      }
     }
   },
   "scripts": {

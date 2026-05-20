@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { MarkdownLiveServer } from './server';
+import type { ScanOptions } from './tree';
 
 type ServerState = 'stopped' | 'starting' | 'started' | 'stopping';
 
@@ -10,6 +11,8 @@ let liveRootPath: string | undefined;
 let livePort: number | undefined;
 let serverState: ServerState = 'stopped';
 let statusBarItem: vscode.StatusBarItem;
+let fileWatcher: vscode.FileSystemWatcher | undefined;
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -83,7 +86,8 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
   }
 
   liveRootPath = rootPath;
-  liveServer = new MarkdownLiveServer({ rootPath, entryPath });
+  const siteMenuOptions = getSiteMenuOptions();
+  liveServer = new MarkdownLiveServer({ rootPath, entryPath, siteMenu: siteMenuOptions });
   serverState = 'starting';
   updateStatusBar();
 
@@ -91,6 +95,23 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
     livePort = await liveServer.start();
     serverState = 'started';
     updateStatusBar();
+
+    fileWatcher = vscode.workspace.createFileSystemWatcher('**/*');
+    fileWatcher.onDidCreate((uri) => {
+      if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+        debouncedRebuildTree();
+      }
+    });
+    fileWatcher.onDidDelete((uri) => {
+      if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+        debouncedRebuildTree();
+      }
+    });
+    fileWatcher.onDidChange((uri) => {
+      if (liveRootPath && isInsideRoot(uri.fsPath, liveRootPath)) {
+        debouncedRebuildTree();
+      }
+    });
   } catch (error) {
     await liveServer?.stop();
     liveServer = undefined;
@@ -125,11 +146,45 @@ async function stopServer(): Promise<void> {
   serverState = 'stopping';
   updateStatusBar();
   await liveServer.stop();
+
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = undefined;
+  }
+  if (fileWatcher) {
+    fileWatcher.dispose();
+    fileWatcher = undefined;
+  }
+
   liveServer = undefined;
   liveRootPath = undefined;
   livePort = undefined;
   serverState = 'stopped';
   updateStatusBar();
+}
+
+function getSiteMenuOptions(): ScanOptions | undefined {
+  const config = vscode.workspace.getConfiguration('mdLiveServer.siteMenu');
+  const enabled = config.get('enabled', true);
+  if (!enabled) {
+    return undefined;
+  }
+  return {
+    include: config.get('include', ['*']),
+    exclude: config.get('exclude', ['.*', 'node_modules']),
+  };
+}
+
+function debouncedRebuildTree() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(() => {
+    if (liveServer && liveRootPath) {
+      liveServer.rebuildSiteTree();
+      liveServer.broadcastTreeUpdate();
+    }
+  }, 300);
 }
 
 function getEntryPath(resource?: vscode.Uri): string | undefined {
