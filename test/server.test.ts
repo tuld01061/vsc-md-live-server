@@ -94,65 +94,67 @@ describe('broadcastChange', () => {
   it('sends markdown update only to client subscribed to that file', async () => {
     const clientA = new WebSocket(`ws://127.0.0.1:${port}`);
     const clientB = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await Promise.all([
+        new Promise<void>((resolve) => clientA.once('open', resolve)),
+        new Promise<void>((resolve) => clientB.once('open', resolve)),
+      ]);
 
-    await Promise.all([
-      new Promise<void>((resolve) => clientA.once('open', resolve)),
-      new Promise<void>((resolve) => clientB.once('open', resolve)),
-    ]);
+      clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
+      clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
 
-    clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
-    clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
+      // small delay for message processing
+      await new Promise((r) => setTimeout(r, 50));
 
-    // small delay for message processing
-    await new Promise((r) => setTimeout(r, 50));
+      const messagesA: unknown[] = [];
+      const messagesB: unknown[] = [];
+      clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
+      clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
 
-    const messagesA: unknown[] = [];
-    const messagesB: unknown[] = [];
-    clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
-    clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
+      server.broadcastChange(path.join(tmpDir, 'a.md'));
 
-    server.broadcastChange(path.join(tmpDir, 'a.md'));
+      await new Promise((r) => setTimeout(r, 50));
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(messagesA.length).toBe(1);
-    expect(messagesA[0]).toMatchObject({ type: 'markdown' });
-    expect(messagesB.length).toBe(0);
-
-    clientA.close();
-    clientB.close();
+      expect(messagesA.length).toBe(1);
+      expect(messagesA[0]).toMatchObject({ type: 'markdown' });
+      expect(messagesB.length).toBe(0);
+    } finally {
+      clientA.close();
+      clientB.close();
+    }
   });
 
   it('sends reload to all clients regardless of subscription', async () => {
     const clientA = new WebSocket(`ws://127.0.0.1:${port}`);
     const clientB = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await Promise.all([
+        new Promise<void>((resolve) => clientA.once('open', resolve)),
+        new Promise<void>((resolve) => clientB.once('open', resolve)),
+      ]);
 
-    await Promise.all([
-      new Promise<void>((resolve) => clientA.once('open', resolve)),
-      new Promise<void>((resolve) => clientB.once('open', resolve)),
-    ]);
+      clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
+      clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
 
-    clientA.send(JSON.stringify({ type: 'subscribe', path: '/a.md' }));
-    clientB.send(JSON.stringify({ type: 'subscribe', path: '/b.md' }));
+      await new Promise((r) => setTimeout(r, 50));
 
-    await new Promise((r) => setTimeout(r, 50));
+      const messagesA: unknown[] = [];
+      const messagesB: unknown[] = [];
+      clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
+      clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
 
-    const messagesA: unknown[] = [];
-    const messagesB: unknown[] = [];
-    clientA.on('message', (data) => messagesA.push(JSON.parse(String(data))));
-    clientB.on('message', (data) => messagesB.push(JSON.parse(String(data))));
+      server.broadcastChange(path.join(tmpDir, 'page.html'));
 
-    server.broadcastChange(path.join(tmpDir, 'page.html'));
+      await new Promise((r) => setTimeout(r, 50));
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(messagesA.length).toBe(1);
-    expect(messagesA[0]).toEqual({ type: 'reload' });
-    expect(messagesB.length).toBe(1);
-    expect(messagesB[0]).toEqual({ type: 'reload' });
-
-    clientA.close();
-    clientB.close();
+      expect(messagesA.length).toBe(1);
+      expect(messagesA[0]).toEqual({ type: 'reload' });
+      expect(messagesB.length).toBe(1);
+      expect(messagesB[0]).toEqual({ type: 'reload' });
+    } finally {
+      clientA.close();
+      clientB.close();
+    }
   });
 });
 
@@ -185,15 +187,23 @@ describe('broadcastTreeUpdate', () => {
         client.once('error', reject);
       });
 
-      const messagePromise = new Promise<unknown>((resolve) => {
-        client.once('message', (data) => resolve(JSON.parse(String(data))));
-      });
+      const messages: unknown[] = [];
+      client.on('message', (data) => messages.push(JSON.parse(String(data))));
 
       server.broadcastTreeUpdate();
 
-      const msg = await messagePromise;
-      expect(msg).toMatchObject({ type: 'treeUpdate' });
-      expect((msg as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
+      // Wait for message to arrive
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (messages.length > 0) resolve();
+          else setTimeout(check, 10);
+        };
+        check();
+      });
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toMatchObject({ type: 'treeUpdate' });
+      expect((messages[0] as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
     } finally {
       client.close();
     }
