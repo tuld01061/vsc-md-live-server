@@ -195,14 +195,33 @@ function debouncedRebuildTree() {
   }, 300);
 }
 
+function isSupportedFile(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return ext === '.md' || ext === '.html';
+}
+
 function getEntryPath(resource?: vscode.Uri): string | undefined {
   if (resource?.scheme === 'file') {
-    return resource.fsPath;
+    if (isSupportedFile(resource.fsPath)) {
+      return resource.fsPath;
+    }
+    try {
+      const stat = fs.statSync(resource.fsPath);
+      if (stat.isDirectory()) {
+        return resource.fsPath;
+      }
+    } catch {
+      // fall through to parent directory
+    }
+    return path.dirname(resource.fsPath);
   }
 
   const activeDocument = vscode.window.activeTextEditor?.document;
   if (activeDocument?.uri.scheme === 'file') {
-    return activeDocument.uri.fsPath;
+    if (isSupportedFile(activeDocument.uri.fsPath)) {
+      return activeDocument.uri.fsPath;
+    }
+    return path.dirname(activeDocument.uri.fsPath);
   }
 
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
