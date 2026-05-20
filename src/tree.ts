@@ -52,6 +52,9 @@ export function scanDirectory(rootPath: string, requestPath: string, options: Sc
     if (item.isDirectory()) {
       const itemRootPath = path.join(rootPath, item.name);
       const children = scanDirectory(itemRootPath, itemRequestPath, options, visited);
+      if (children.length === 0) {
+        continue;
+      }
       entries.push({ name: item.name, path: itemRequestPath + '/', type: 'directory', children });
     } else {
       entries.push({ name: item.name, path: itemRequestPath, type: 'file' });

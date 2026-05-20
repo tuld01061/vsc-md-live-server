@@ -73,6 +73,20 @@ describe('scanDirectory', () => {
     }
   });
 
+  it('excludes directories that contain no md or html files', () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-empty-dir-'));
+    fs.mkdirSync(path.join(emptyDir, 'empty-folder'));
+    fs.writeFileSync(path.join(emptyDir, 'empty-folder', 'script.js'), 'x');
+    fs.writeFileSync(path.join(emptyDir, 'readme.md'), '# Readme');
+    try {
+      const tree = scanDirectory(emptyDir, '/', { include: ['*'], exclude: ['.*', 'node_modules'] });
+      expect(tree.find(n => n.name === 'empty-folder')).toBeUndefined();
+      expect(tree.find(n => n.name === 'readme.md')).toBeDefined();
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
   it('handles symlinks gracefully', () => {
     const linkDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-link-'));
     fs.mkdirSync(path.join(linkDir, 'docs'));

@@ -3,7 +3,7 @@ import * as path from 'path';
 import type { TreeNode } from './tree';
 
 export function renderMarkdownPage(content: string, title: string, port: number, siteTree?: TreeNode[]): string {
-  const hasSidebar = siteTree !== undefined;
+  const hasSidebar = siteTree !== undefined && siteTree.length > 0;
 
   const sidebarStyles = hasSidebar ? `
     #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid var(--border); overflow-y: auto; padding: 1rem; background: var(--bg); z-index: 100; box-sizing: border-box; }
@@ -387,7 +387,7 @@ export function renderMarkdownPage(content: string, title: string, port: number,
 }
 
 export function renderHtmlPage(content: string, port: number, siteTree?: TreeNode[]): string {
-  const hasSidebar = siteTree !== undefined;
+  const hasSidebar = siteTree !== undefined && siteTree.length > 0;
 
   const sidebarHtml = hasSidebar ? `
     <aside id="site-menu" style="position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid #d0d7de; overflow-y: auto; padding: 1rem; background: #fff; z-index: 100; box-sizing: border-box;">

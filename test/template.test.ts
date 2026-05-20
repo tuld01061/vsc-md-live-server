@@ -18,9 +18,10 @@ describe('renderMarkdownPage', () => {
     expect(html).not.toContain('__SITE_TREE_UPDATE__');
   });
 
-  it('includes empty sidebar when siteTree is empty array', () => {
+  it('does not include sidebar when siteTree is empty array', () => {
     const html = renderMarkdownPage('# Hello', 'Test', 3000, []);
-    expect(html).toContain('id="site-menu"');
+    expect(html).not.toContain('id="site-menu"');
+    expect(html).not.toContain('__SITE_TREE_UPDATE__');
   });
 });
 
