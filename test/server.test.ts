@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
+import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
 import { WebSocket } from 'ws';
@@ -282,5 +283,50 @@ describe('edit endpoints', () => {
       body: JSON.stringify({ path: '/a.md' }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('port fallback', () => {
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-port-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.md'), '# A');
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('uses the requested port when it is free', async () => {
+    const probe = http.createServer();
+    const free: number = await new Promise((resolve) => {
+      probe.listen(0, '0.0.0.0', () => resolve((probe.address() as { port: number }).port));
+    });
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+
+    const server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'a.md'), port: free });
+    try {
+      const actual = await server.start();
+      expect(actual).toBe(free);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('falls back to the next port when the requested port is in use', async () => {
+    const blocker = http.createServer();
+    const taken: number = await new Promise((resolve) => {
+      blocker.listen(0, '0.0.0.0', () => resolve((blocker.address() as { port: number }).port));
+    });
+
+    const server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'a.md'), port: taken });
+    try {
+      const actual = await server.start();
+      expect(actual).toBe(taken + 1);
+    } finally {
+      await server.stop();
+      await new Promise<void>((resolve) => blocker.close(() => resolve()));
+    }
   });
 });

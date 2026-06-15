@@ -32,6 +32,7 @@ interface MarkdownMessage {
 }
 
 export class MarkdownLiveServer {
+  private static readonly PORT_FALLBACK_ATTEMPTS = 100;
   private readonly markdown = new MarkdownIt({ html: true, linkify: true, typographer: true });
   private readonly port: number;
   private readonly rootPath: string;
@@ -172,14 +173,58 @@ export class MarkdownLiveServer {
       });
     });
 
-    await new Promise<void>((resolve, reject) => {
-      this.httpServer?.once('error', reject);
-      this.httpServer?.listen(this.port, '0.0.0.0', () => resolve());
-    });
+    await this.listenWithFallback(this.httpServer, this.port);
 
     this.rebuildSiteTree();
 
     return this.currentPort();
+  }
+
+  private async listenWithFallback(server: http.Server, startPort: number): Promise<void> {
+    const host = '0.0.0.0';
+    // A requested port of 0 lets the OS assign any free port; otherwise probe for the
+    // first available port starting at the requested one (e.g. 4400 → 4401 → 4402 …).
+    const port = startPort === 0
+      ? 0
+      : await this.findAvailablePort(startPort, host, MarkdownLiveServer.PORT_FALLBACK_ATTEMPTS);
+
+    await new Promise<void>((resolve, reject) => {
+      const onError = (error: NodeJS.ErrnoException) => {
+        server.removeListener('error', onError);
+        reject(error);
+      };
+      server.once('error', onError);
+      server.listen(port, host, () => {
+        server.removeListener('error', onError);
+        resolve();
+      });
+    });
+  }
+
+  private findAvailablePort(startPort: number, host: string, maxAttempts: number): Promise<number> {
+    return new Promise<number>((resolve, reject) => {
+      let port = startPort;
+      let attemptsLeft = maxAttempts;
+
+      const tryPort = () => {
+        const probe = net.createServer();
+        probe.once('error', (error: NodeJS.ErrnoException) => {
+          if (error.code === 'EADDRINUSE' && attemptsLeft > 0) {
+            attemptsLeft--;
+            port++;
+            tryPort();
+          } else {
+            reject(error);
+          }
+        });
+        probe.listen(port, host, () => {
+          const assigned = (probe.address() as net.AddressInfo).port;
+          probe.close(() => resolve(assigned));
+        });
+      };
+
+      tryPort();
+    });
   }
 
   async stop(): Promise<void> {

@@ -88,7 +88,7 @@ async function startServer(resource?: vscode.Uri): Promise<void> {
 
   liveRootPath = rootPath;
   const siteMenuOptions = getSiteMenuOptions();
-  liveServer = new MarkdownLiveServer({ rootPath, entryPath, siteMenu: siteMenuOptions });
+  liveServer = new MarkdownLiveServer({ rootPath, entryPath, siteMenu: siteMenuOptions, port: getPreferredPort() });
   serverState = 'starting';
   updateStatusBar();
 
@@ -167,6 +167,11 @@ async function stopServer(): Promise<void> {
   livePort = undefined;
   serverState = 'stopped';
   updateStatusBar();
+}
+
+function getPreferredPort(): number {
+  const port = vscode.workspace.getConfiguration('mdLiveServer').get('port', 4400);
+  return Number.isInteger(port) && port > 0 && port < 65536 ? port : 4400;
 }
 
 function getSiteMenuOptions(): ScanOptions | undefined {

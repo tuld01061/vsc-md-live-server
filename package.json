@@ -55,6 +55,13 @@
     "configuration": {
       "title": "Markdown Live Server",
       "properties": {
+        "mdLiveServer.port": {
+          "type": "number",
+          "default": 4400,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Preferred port for the live server. If it is busy, the next available port (4401, 4402, …) is used."
+        },
         "mdLiveServer.siteMenu.enabled": {
           "type": "boolean",
           "default": true,
