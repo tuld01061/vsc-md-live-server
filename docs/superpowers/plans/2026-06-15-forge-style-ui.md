@@ -958,10 +958,10 @@ export function renderMarkdownPage(
       const message = JSON.parse(event.data);
       if (window.__MDLS_EDITING__) return;
       if (message.type === 'reload') { location.reload(); return; }
-      if (message.type === 'treeUpdate') {
+      ${hasSidebar ? `if (message.type === 'treeUpdate') {
         if (window.__SITE_TREE_UPDATE__) window.__SITE_TREE_UPDATE__(message.tree);
         return;
-      }
+      }` : ''}
       const contentDiv = document.getElementById('content');
       contentDiv.innerHTML = message.content;
       contentDiv.querySelectorAll('script').forEach((oldScript) => {
