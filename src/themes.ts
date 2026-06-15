@@ -73,8 +73,8 @@ export const CODE_THEMES: CodeTheme[] = [
   { id: 'vs', label: 'VS', href: `${HLJS_BASE}vs.min.css` },
   { id: 'tokyo-night-dark', label: 'Tokyo Night Dark', href: `${HLJS_BASE}tokyo-night-dark.min.css` },
   { id: 'tokyo-night-light', label: 'Tokyo Night Light', href: `${HLJS_BASE}tokyo-night-light.min.css` },
-  { id: 'a11y-dark', label: 'A11y Dark', href: `${HLJS_BASE}base16/atelier-forest.min.css` },
-  { id: 'a11y-light', label: 'A11y Light', href: `${HLJS_BASE}base16/atelier-forest-light.min.css` },
+  { id: 'a11y-dark', label: 'A11y Dark', href: `${HLJS_BASE}a11y-dark.min.css` },
+  { id: 'a11y-light', label: 'A11y Light', href: `${HLJS_BASE}a11y-light.min.css` },
 ];
 
 function varsToCss(v: ThemeVars): string {
