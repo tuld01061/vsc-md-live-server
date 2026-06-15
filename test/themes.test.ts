@@ -40,6 +40,23 @@ describe('CONTENT_THEMES', () => {
   it('contains the default content theme', () => {
     expect(CONTENT_THEMES.some((t) => t.id === DEFAULT_CONTENT_THEME)).toBe(true);
   });
+
+  it('contains exactly the seven expected palettes in alphabetical order', () => {
+    expect(CONTENT_THEMES.map((t) => t.id)).toEqual([
+      'aurora',
+      'forest',
+      'ghibli',
+      'midnight',
+      'modern',
+      'ocean',
+      'sunset',
+    ]);
+  });
+
+  it('gives every theme a distinct light background so light mode is visibly themed', () => {
+    const bgs = CONTENT_THEMES.map((t) => t.light.bg);
+    expect(new Set(bgs).size).toBe(bgs.length);
+  });
 });
 
 describe('buildThemeCss', () => {

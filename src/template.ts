@@ -22,7 +22,8 @@ export function renderMarkdownPage(
   const ICON_FILE = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 1.75C2 .784 2.784 0 3.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237V14.25A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5Zm5.75.56v2.19c0 .138.112.25.25.25h2.19Z"/></svg>';
   const ICON_PRINT = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M5 1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75V3h1.25A1.75 1.75 0 0 1 14 4.75v4.5A1.75 1.75 0 0 1 12.25 11H11v3.25a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75V11H3.75A1.75 1.75 0 0 1 2 9.25v-4.5A1.75 1.75 0 0 1 3.75 3H5Zm1.5 1.25h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Zm0 8.5v2.25h3V11.5Zm-1.5-1.5h6V4.75a.25.25 0 0 0-.25-.25H3.75a.25.25 0 0 0-.25.25v4.5c0 .138.112.25.25.25Z"/></svg>';
   const ICON_EDIT = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg>';
-  const ICON_LOGO = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3ZM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6Zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5Z"/></svg>';
+  const ICON_LOGO = '<svg viewBox="0 0 128 128" aria-hidden="true"><rect width="128" height="128" rx="24" fill="#0d1117"/><path d="M24 88V40h14l14 22 14-22h14v48H66V62L54 80h-4L38 62v26H24z" fill="#ffffff"/><path d="M82 88V40h14v36h20v12H82z" fill="#58a6ff"/></svg>';
+  const ICON_FOLDER = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2c-.33-.44-.85-.7-1.4-.7H1.75Z"/></svg>';
 
   const contentOptions = CONTENT_THEMES
     .map((t) => `<option value="${escapeAttribute(t.id)}">${escapeHtml(t.label)}</option>`)
@@ -66,7 +67,7 @@ export function renderMarkdownPage(
     #site-menu { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; border-right: 1px solid var(--border); background: var(--sidebar-bg); z-index: 100; box-sizing: border-box; transition: transform 0.2s; display: flex; flex-direction: column; padding: 1rem; }
     #site-menu.collapsed { transform: translateX(-260px); }
     .menu-brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; font-size: 1rem; padding-bottom: 0.75rem; color: var(--fg); }
-    .menu-brand svg { width: 1.4rem; height: 1.4rem; color: var(--accent); }
+    .menu-brand svg { width: 1.6rem; height: 1.6rem; border-radius: 5px; flex: none; }
     #site-menu-search { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); margin-bottom: 0.5rem; box-sizing: border-box; font-size: 0.875rem; }
     #site-menu-tree { flex: 1 1 auto; overflow-y: auto; font-size: 0.875rem; }
     #site-menu-tree ul { list-style: none; padding: 0; margin: 0; }
@@ -75,11 +76,13 @@ export function renderMarkdownPage(
     #site-menu-tree a { text-decoration: none; display: flex; align-items: center; gap: 0.35rem; padding: 0.15rem 0.35rem; border-radius: 4px; color: var(--fg); }
     #site-menu-tree a:hover { color: var(--link); }
     #site-menu-tree a.active { font-weight: 600; color: var(--accent); background: var(--code-bg); }
-    #site-menu-tree .node-icon { display: inline-flex; color: var(--muted); }
-    #site-menu-tree .node-icon svg { width: 0.85rem; height: 0.85rem; }
+    #site-menu-tree .node-icon { display: inline-flex; flex: none; color: var(--muted); }
+    #site-menu-tree .node-icon svg { width: 0.9rem; height: 0.9rem; }
+    #site-menu-tree .node-icon.folder-icon { color: var(--accent); }
+    #site-menu-tree .node-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .menu-folder { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; padding: 0.15rem 0.35rem; border-radius: 4px; }
     .menu-folder:hover { background: var(--code-bg); }
-    .menu-folder .chev { color: var(--muted); font-size: 0.7rem; width: 0.8rem; user-select: none; }
+    .menu-folder .chev { flex: none; margin-left: 0.15rem; color: var(--muted); font-size: 0.7rem; user-select: none; }
     .menu-footer { border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.6rem; }
     .menu-field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
     .menu-field select { text-transform: none; letter-spacing: normal; padding: 0.35rem 0.5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 0.8rem; }
@@ -160,8 +163,9 @@ export function renderMarkdownPage(
     (function() {
       const TREE_STATE_KEY = 'md-live-server-tree-state';
       const FILE_ICON = '${ICON_FILE.replace(/'/g, "\\'")}';
-      const FOLDER_OPEN = '▾';
-      const FOLDER_CLOSED = '▸';
+      const FOLDER_ICON = '${ICON_FOLDER.replace(/'/g, "\\'")}';
+      const FOLDER_OPEN = '⌄';
+      const FOLDER_CLOSED = '›';
       let currentTree = ${JSON.stringify(siteTree).replace(/</g, '\\u003c')};
 
       function loadExpandedState() {
@@ -188,13 +192,18 @@ export function renderMarkdownPage(
             const isExpanded = expanded.has(node.path) || !!query;
             const folderDiv = document.createElement('div');
             folderDiv.className = 'menu-folder';
+            const icon = document.createElement('span');
+            icon.className = 'node-icon folder-icon';
+            icon.innerHTML = FOLDER_ICON;
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'node-name';
+            nameSpan.textContent = node.name;
             const chev = document.createElement('span');
             chev.className = 'chev';
             chev.textContent = isExpanded ? FOLDER_OPEN : FOLDER_CLOSED;
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = node.name;
-            folderDiv.appendChild(chev);
+            folderDiv.appendChild(icon);
             folderDiv.appendChild(nameSpan);
+            folderDiv.appendChild(chev);
             li.appendChild(folderDiv);
             if (node.children && isExpanded) renderTree(node.children, expanded, li, depth + 1, query);
             const toggleHandler = (e) => {
@@ -211,8 +220,11 @@ export function renderMarkdownPage(
             const icon = document.createElement('span');
             icon.className = 'node-icon';
             icon.innerHTML = FILE_ICON;
+            const fileName = document.createElement('span');
+            fileName.className = 'node-name';
+            fileName.textContent = node.name;
             link.appendChild(icon);
-            link.appendChild(document.createTextNode(node.name));
+            link.appendChild(fileName);
             if (node.path === location.pathname) link.className = 'active';
             li.appendChild(link);
           }

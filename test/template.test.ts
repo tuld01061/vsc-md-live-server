@@ -56,6 +56,19 @@ describe('renderMarkdownPage', () => {
     expect(html).not.toContain('ws://127.0.0.1');
     expect(html).toContain('location.host');
   });
+
+  it('renders distinct folder and file icons in the sidebar tree', () => {
+    const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
+    const html = renderMarkdownPage('# Hi', 'a.md', tree, true);
+    expect(html).toContain('FOLDER_ICON');
+    expect(html).toContain('folder-icon');
+  });
+
+  it('uses the Md Live Server logo artwork in the sidebar brand', () => {
+    const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
+    const html = renderMarkdownPage('# Hi', 'a.md', tree, true);
+    expect(html).toContain('M82 88V40h14v36h20v12H82z');
+  });
 });
 
 describe('renderHtmlPage', () => {
