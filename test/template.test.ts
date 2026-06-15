@@ -23,6 +23,32 @@ describe('renderMarkdownPage', () => {
     expect(html).not.toContain('id="site-menu"');
     expect(html).not.toContain('__SITE_TREE_UPDATE__');
   });
+
+  it('renders the header bar, branding, and theme selectors with a sidebar', () => {
+    const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
+    const html = renderMarkdownPage('# Hi', 'a.md', 3000, tree, true);
+    expect(html).toContain('id="app-header"');
+    expect(html).toContain('Md Live Server');
+    expect(html).toContain('id="content-theme-select"');
+    expect(html).toContain('id="code-theme-select"');
+    expect(html).toContain('data-mode-toggle');
+    expect(html).toContain('id="print-btn"');
+  });
+
+  it('includes editor assets when editable', () => {
+    const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
+    const html = renderMarkdownPage('# Hi', 'a.md', 3000, tree, true);
+    expect(html).toContain('id="md-editor"');
+    expect(html).toContain('id="edit-btn"');
+    expect(html).toContain('__mdls__/save');
+  });
+
+  it('omits editor assets when not editable', () => {
+    const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
+    const html = renderMarkdownPage('# Hi', 'a.md', 3000, tree, false);
+    expect(html).not.toContain('id="md-editor"');
+    expect(html).not.toContain('id="edit-btn"');
+  });
 });
 
 describe('renderHtmlPage', () => {
