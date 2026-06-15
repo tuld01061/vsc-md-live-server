@@ -123,7 +123,6 @@ export class MarkdownLiveServer {
         response.send(renderDirectoryMarkdownPage(
           request.path,
           fs.readdirSync(filePath, { withFileTypes: true }),
-          this.currentPort(),
           this.siteMenuOptions ? this.siteTree : undefined
         ));
         return;
@@ -133,7 +132,6 @@ export class MarkdownLiveServer {
         response.send(renderMarkdownPage(
           this.renderMarkdownFile(filePath),
           path.basename(filePath),
-          this.currentPort(),
           this.siteMenuOptions ? this.siteTree : undefined,
           true
         ));
@@ -143,7 +141,6 @@ export class MarkdownLiveServer {
       if (path.extname(filePath).toLowerCase() === '.html') {
         response.send(renderHtmlPage(
           fs.readFileSync(filePath, 'utf8'),
-          this.currentPort(),
           this.siteMenuOptions ? this.siteTree : undefined
         ));
         return;
@@ -259,7 +256,7 @@ export class MarkdownLiveServer {
         return;
       }
       const clientPath = this.clientPaths.get(client);
-      if (isMarkdown && clientPath && clientPath !== decodeURIComponent(requestPath)) {
+      if (isMarkdown && clientPath && this.decodePath(clientPath) !== this.decodePath(requestPath)) {
         return;
       }
       client.send(payload);
@@ -346,6 +343,17 @@ export class MarkdownLiveServer {
 
   private addLinkTargets(html: string): string {
     return html.replace(/<a href="(https?:\/\/[^"]*)"/gi, '<a href="$1" target="_blank" rel="noopener noreferrer"');
+  }
+
+  // Normalises a request path for comparison. Clients send the browser's
+  // percent-encoded location.pathname, while toRequestPath also encodes each
+  // segment; decoding both sides makes the comparison robust for non-ASCII names.
+  private decodePath(value: string): string {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
   }
 
   private toRequestPath(filePath: string): string {

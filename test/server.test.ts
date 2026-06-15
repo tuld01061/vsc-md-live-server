@@ -157,6 +157,31 @@ describe('broadcastChange', () => {
       clientB.close();
     }
   });
+
+  it('sends markdown update to a client subscribed with an encoded non-ASCII path', async () => {
+    const fileName = 'café.md';
+    fs.writeFileSync(path.join(tmpDir, fileName), '# Café');
+    const client = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await new Promise<void>((resolve) => client.once('open', resolve));
+      // Browsers send the percent-encoded pathname (e.g. /caf%C3%A9.md).
+      client.send(JSON.stringify({ type: 'subscribe', path: '/' + encodeURIComponent(fileName) }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const messages: unknown[] = [];
+      client.on('message', (data) => messages.push(JSON.parse(String(data))));
+
+      server.broadcastChange(path.join(tmpDir, fileName));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toMatchObject({ type: 'markdown' });
+    } finally {
+      client.close();
+    }
+  });
 });
 
 describe('broadcastTreeUpdate', () => {

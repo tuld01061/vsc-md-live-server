@@ -13,7 +13,6 @@ import {
 export function renderMarkdownPage(
   content: string,
   title: string,
-  port: number,
   siteTree?: TreeNode[],
   editable: boolean = false
 ): string {
@@ -448,7 +447,7 @@ export function renderMarkdownPage(
 
   const wsScript = `
     <script>
-    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
     });
@@ -573,7 +572,7 @@ export function renderMarkdownPage(
 </html>`;
 }
 
-export function renderHtmlPage(content: string, port: number, siteTree?: TreeNode[]): string {
+export function renderHtmlPage(content: string, siteTree?: TreeNode[]): string {
   const hasSidebar = siteTree !== undefined && siteTree.length > 0;
 
   const sidebarHtml = hasSidebar ? `
@@ -722,7 +721,7 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
     })();
     </script>
     <script>
-    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({ type: 'subscribe', path: location.pathname }));
     });
@@ -736,7 +735,7 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
     </script>
   ` : `
     <script>
-    const socket = new WebSocket('ws://127.0.0.1:${port}');
+    const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.type === 'reload') { location.reload(); }
@@ -752,7 +751,7 @@ export function renderHtmlPage(content: string, port: number, siteTree?: TreeNod
   }
 
   const script = `<script>
-  const socket = new WebSocket('ws://127.0.0.1:${port}');
+  const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
     if (message.type === 'reload') {
@@ -795,7 +794,7 @@ export function renderDirectoryPage(requestPath: string, entries: fs.Dirent[]): 
 </html>`;
 }
 
-export function renderDirectoryMarkdownPage(requestPath: string, entries: fs.Dirent[], port: number, siteTree?: TreeNode[]): string {
+export function renderDirectoryMarkdownPage(requestPath: string, entries: fs.Dirent[], siteTree?: TreeNode[]): string {
   const parentPath = path.posix.dirname(requestPath === '/' ? '' : requestPath);
   const links = [requestPath !== '/' ? `<li><a href="${escapeAttribute(parentPath || '/')}">..</a></li>` : '']
     .concat(entries.map((entry) => {
@@ -806,7 +805,7 @@ export function renderDirectoryMarkdownPage(requestPath: string, entries: fs.Dir
     .join('');
 
   const content = `<h1>${escapeHtml(`Index of ${requestPath}`)}</h1><ul>${links}</ul>`;
-  return renderMarkdownPage(content, `Index of ${requestPath}`, port, siteTree);
+  return renderMarkdownPage(content, `Index of ${requestPath}`, siteTree);
 }
 
 function escapeHtml(value: string): string {
