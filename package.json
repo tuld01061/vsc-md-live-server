@@ -2,7 +2,7 @@
   "name": "md-live-server",
   "displayName": "Markdown Live Server",
   "description": "Preview Markdown, Mermaid diagrams, and static web files with a local live-reload server.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "tuld01061",
   "engines": {
     "vscode": "^1.90.0"
