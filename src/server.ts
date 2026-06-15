@@ -9,6 +9,12 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { renderDirectoryMarkdownPage, renderHtmlPage, renderMarkdownPage } from './template';
 import { scanDirectory, TreeNode, ScanOptions } from './tree';
 
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+export function isLoopback(remoteAddress?: string): boolean {
+  return remoteAddress !== undefined && LOOPBACK_ADDRESSES.has(remoteAddress);
+}
+
 export interface MarkdownLiveServerOptions {
   port?: number;
   rootPath: string;
@@ -26,6 +32,7 @@ interface MarkdownMessage {
 }
 
 export class MarkdownLiveServer {
+  private static readonly PORT_FALLBACK_ATTEMPTS = 100;
   private readonly markdown = new MarkdownIt({ html: true, linkify: true, typographer: true });
   private readonly port: number;
   private readonly rootPath: string;
@@ -53,6 +60,58 @@ export class MarkdownLiveServer {
 
     const app = express();
 
+    app.use(express.json({ limit: '5mb' }));
+
+    app.get('/__mdls__/source', (request, response) => {
+      if (!isLoopback(request.socket.remoteAddress)) {
+        response.status(403).json({ error: 'forbidden' });
+        return;
+      }
+      const reqPath = typeof request.query.path === 'string' ? request.query.path : '';
+      const filePath = this.resolveRequestPath(reqPath);
+      if (!filePath || path.extname(filePath).toLowerCase() !== '.md') {
+        response.status(404).json({ error: 'not found' });
+        return;
+      }
+      try {
+        if (fs.statSync(filePath).isDirectory()) {
+          response.status(404).json({ error: 'not a file' });
+          return;
+        }
+        response.json({ content: fs.readFileSync(filePath, 'utf8') });
+      } catch {
+        response.status(404).json({ error: 'not found' });
+      }
+    });
+
+    app.post('/__mdls__/save', (request, response) => {
+      if (!isLoopback(request.socket.remoteAddress)) {
+        response.status(403).json({ error: 'forbidden' });
+        return;
+      }
+      const body = request.body as { path?: unknown; content?: unknown };
+      if (typeof body?.path !== 'string' || typeof body?.content !== 'string') {
+        response.status(400).json({ error: 'invalid body' });
+        return;
+      }
+      const filePath = this.resolveRequestPath(body.path);
+      if (!filePath || path.extname(filePath).toLowerCase() !== '.md') {
+        response.status(404).json({ error: 'not found' });
+        return;
+      }
+      try {
+        if (fs.statSync(filePath).isDirectory()) {
+          response.status(400).json({ error: 'not a file' });
+          return;
+        }
+        fs.writeFileSync(filePath, body.content, 'utf8');
+        this.broadcastChange(filePath, body.content);
+        response.json({ ok: true });
+      } catch (error) {
+        response.status(500).json({ error: error instanceof Error ? error.message : 'write failed' });
+      }
+    });
+
     app.get('*', (request, response, next) => {
       const filePath = this.resolveRequestPath(request.path);
       if (!filePath) {
@@ -64,7 +123,6 @@ export class MarkdownLiveServer {
         response.send(renderDirectoryMarkdownPage(
           request.path,
           fs.readdirSync(filePath, { withFileTypes: true }),
-          this.currentPort(),
           this.siteMenuOptions ? this.siteTree : undefined
         ));
         return;
@@ -74,8 +132,8 @@ export class MarkdownLiveServer {
         response.send(renderMarkdownPage(
           this.renderMarkdownFile(filePath),
           path.basename(filePath),
-          this.currentPort(),
-          this.siteMenuOptions ? this.siteTree : undefined
+          this.siteMenuOptions ? this.siteTree : undefined,
+          true
         ));
         return;
       }
@@ -83,7 +141,6 @@ export class MarkdownLiveServer {
       if (path.extname(filePath).toLowerCase() === '.html') {
         response.send(renderHtmlPage(
           fs.readFileSync(filePath, 'utf8'),
-          this.currentPort(),
           this.siteMenuOptions ? this.siteTree : undefined
         ));
         return;
@@ -113,14 +170,58 @@ export class MarkdownLiveServer {
       });
     });
 
-    await new Promise<void>((resolve, reject) => {
-      this.httpServer?.once('error', reject);
-      this.httpServer?.listen(this.port, '0.0.0.0', () => resolve());
-    });
+    await this.listenWithFallback(this.httpServer, this.port);
 
     this.rebuildSiteTree();
 
     return this.currentPort();
+  }
+
+  private async listenWithFallback(server: http.Server, startPort: number): Promise<void> {
+    const host = '0.0.0.0';
+    // A requested port of 0 lets the OS assign any free port; otherwise probe for the
+    // first available port starting at the requested one (e.g. 4400 → 4401 → 4402 …).
+    const port = startPort === 0
+      ? 0
+      : await this.findAvailablePort(startPort, host, MarkdownLiveServer.PORT_FALLBACK_ATTEMPTS);
+
+    await new Promise<void>((resolve, reject) => {
+      const onError = (error: NodeJS.ErrnoException) => {
+        server.removeListener('error', onError);
+        reject(error);
+      };
+      server.once('error', onError);
+      server.listen(port, host, () => {
+        server.removeListener('error', onError);
+        resolve();
+      });
+    });
+  }
+
+  private findAvailablePort(startPort: number, host: string, maxAttempts: number): Promise<number> {
+    return new Promise<number>((resolve, reject) => {
+      let port = startPort;
+      let attemptsLeft = maxAttempts;
+
+      const tryPort = () => {
+        const probe = net.createServer();
+        probe.once('error', (error: NodeJS.ErrnoException) => {
+          if (error.code === 'EADDRINUSE' && attemptsLeft > 0) {
+            attemptsLeft--;
+            port++;
+            tryPort();
+          } else {
+            reject(error);
+          }
+        });
+        probe.listen(port, host, () => {
+          const assigned = (probe.address() as net.AddressInfo).port;
+          probe.close(() => resolve(assigned));
+        });
+      };
+
+      tryPort();
+    });
   }
 
   async stop(): Promise<void> {
@@ -155,7 +256,7 @@ export class MarkdownLiveServer {
         return;
       }
       const clientPath = this.clientPaths.get(client);
-      if (isMarkdown && clientPath && clientPath !== decodeURIComponent(requestPath)) {
+      if (isMarkdown && clientPath && this.decodePath(clientPath) !== this.decodePath(requestPath)) {
         return;
       }
       client.send(payload);
@@ -242,6 +343,17 @@ export class MarkdownLiveServer {
 
   private addLinkTargets(html: string): string {
     return html.replace(/<a href="(https?:\/\/[^"]*)"/gi, '<a href="$1" target="_blank" rel="noopener noreferrer"');
+  }
+
+  // Normalises a request path for comparison. Clients send the browser's
+  // percent-encoded location.pathname, while toRequestPath also encodes each
+  // segment; decoding both sides makes the comparison robust for non-ASCII names.
+  private decodePath(value: string): string {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
   }
 
   private toRequestPath(filePath: string): string {

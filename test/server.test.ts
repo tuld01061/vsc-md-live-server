@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
+import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
 import { WebSocket } from 'ws';
-import { MarkdownLiveServer } from '../src/server';
+import { MarkdownLiveServer, isLoopback } from '../src/server';
 
 describe('resolveRequestPath', () => {
   let tmpDir: string;
@@ -156,6 +157,31 @@ describe('broadcastChange', () => {
       clientB.close();
     }
   });
+
+  it('sends markdown update to a client subscribed with an encoded non-ASCII path', async () => {
+    const fileName = 'café.md';
+    fs.writeFileSync(path.join(tmpDir, fileName), '# Café');
+    const client = new WebSocket(`ws://127.0.0.1:${port}`);
+    try {
+      await new Promise<void>((resolve) => client.once('open', resolve));
+      // Browsers send the percent-encoded pathname (e.g. /caf%C3%A9.md).
+      client.send(JSON.stringify({ type: 'subscribe', path: '/' + encodeURIComponent(fileName) }));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const messages: unknown[] = [];
+      client.on('message', (data) => messages.push(JSON.parse(String(data))));
+
+      server.broadcastChange(path.join(tmpDir, fileName));
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(messages.length).toBe(1);
+      expect(messages[0]).toMatchObject({ type: 'markdown' });
+    } finally {
+      client.close();
+    }
+  });
 });
 
 describe('broadcastTreeUpdate', () => {
@@ -206,6 +232,126 @@ describe('broadcastTreeUpdate', () => {
       expect((messages[0] as { tree: unknown[] }).tree.length).toBeGreaterThan(0);
     } finally {
       client.close();
+    }
+  });
+});
+
+describe('isLoopback', () => {
+  it('accepts loopback addresses', () => {
+    expect(isLoopback('127.0.0.1')).toBe(true);
+    expect(isLoopback('::1')).toBe(true);
+    expect(isLoopback('::ffff:127.0.0.1')).toBe(true);
+  });
+
+  it('rejects non-loopback and undefined', () => {
+    expect(isLoopback('203.0.113.5')).toBe(false);
+    expect(isLoopback('192.168.1.10')).toBe(false);
+    expect(isLoopback(undefined)).toBe(false);
+  });
+});
+
+describe('edit endpoints', () => {
+  let tmpDir: string;
+  let server: MarkdownLiveServer;
+  let port: number;
+
+  beforeAll(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-edit-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.md'), '# A');
+    fs.writeFileSync(path.join(tmpDir, 'note.txt'), 'plain');
+    server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'a.md') });
+    port = await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('GET source returns raw markdown for a valid path', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/source?path=${encodeURIComponent('/a.md')}`);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { content: string };
+    expect(json.content).toBe('# A');
+  });
+
+  it('GET source rejects non-markdown paths', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/source?path=${encodeURIComponent('/note.txt')}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('POST save writes the file and returns ok', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/a.md', content: '# Changed' }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(fs.readFileSync(path.join(tmpDir, 'a.md'), 'utf8')).toBe('# Changed');
+  });
+
+  it('POST save rejects path traversal', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/../escape.md', content: 'x' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('POST save rejects an invalid body', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/a.md' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('port fallback', () => {
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-port-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.md'), '# A');
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('uses the requested port when it is free', async () => {
+    const probe = http.createServer();
+    const free: number = await new Promise((resolve) => {
+      probe.listen(0, '0.0.0.0', () => resolve((probe.address() as { port: number }).port));
+    });
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+
+    const server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'a.md'), port: free });
+    try {
+      const actual = await server.start();
+      expect(actual).toBe(free);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('falls back to the next port when the requested port is in use', async () => {
+    const blocker = http.createServer();
+    const taken: number = await new Promise((resolve) => {
+      blocker.listen(0, '0.0.0.0', () => resolve((blocker.address() as { port: number }).port));
+    });
+
+    const server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'a.md'), port: taken });
+    try {
+      const actual = await server.start();
+      expect(actual).toBe(taken + 1);
+    } finally {
+      await server.stop();
+      await new Promise<void>((resolve) => blocker.close(() => resolve()));
     }
   });
 });
