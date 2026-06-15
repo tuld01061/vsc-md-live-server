@@ -280,9 +280,9 @@ export function renderMarkdownPage(
     <script>
     (function() {
       const root = document.documentElement;
-      function applyMode(mode) {
+      function applyMode(mode, persist) {
         root.dataset.mode = mode;
-        localStorage.setItem('md-live-server-theme', mode);
+        if (persist) localStorage.setItem('md-live-server-theme', mode);
         document.querySelectorAll('[data-mode-toggle]').forEach((btn) => {
           btn.dataset.mode = mode;
           const label = btn.querySelector('.mode-label');
@@ -294,9 +294,9 @@ export function renderMarkdownPage(
         if (window.renderMermaid) window.renderMermaid();
       }
       document.querySelectorAll('[data-mode-toggle]').forEach((btn) => {
-        btn.addEventListener('click', () => applyMode(root.dataset.mode === 'dark' ? 'light' : 'dark'));
+        btn.addEventListener('click', () => applyMode(root.dataset.mode === 'dark' ? 'light' : 'dark', true));
       });
-      applyMode(root.dataset.mode === 'dark' ? 'dark' : 'light');
+      applyMode(root.dataset.mode === 'dark' ? 'dark' : 'light', false);
 
       const contentSel = document.getElementById('content-theme-select');
       if (contentSel) {
@@ -354,8 +354,8 @@ export function renderMarkdownPage(
       function renderPreview() {
         if (md) preview.innerHTML = md.render(getValue());
         else preview.textContent = 'Live preview unavailable — Save to render.';
-        if (window.renderMermaid) window.renderMermaid();
-        if (window.highlightCode) window.highlightCode();
+        if (window.renderMermaid) window.renderMermaid(preview);
+        if (window.highlightCode) window.highlightCode(preview);
       }
       function scheduleRender() { clearTimeout(debounceTimer); debounceTimer = setTimeout(renderPreview, 200); }
 
@@ -509,9 +509,11 @@ export function renderMarkdownPage(
 
     window.hljs = hljs;
 
-    window.renderMermaid = async () => {
+    let mermaidSeq = 0;
+    window.renderMermaid = async (root) => {
+      root = root || document;
       if (!mermaid) {
-        document.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
+        root.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
           const msg = document.createElement('div');
           msg.style.color = 'var(--muted)';
           msg.style.padding = '1rem';
@@ -523,14 +525,14 @@ export function renderMarkdownPage(
         return;
       }
       mermaid.initialize({ startOnLoad: false, theme: document.documentElement.dataset.mode === 'dark' ? 'dark' : 'default' });
-      const codes = document.querySelectorAll('pre > code.language-mermaid');
+      const codes = root.querySelectorAll('pre > code.language-mermaid');
       for (let i = 0; i < codes.length; i++) {
         const code = codes[i];
         const container = document.createElement('div');
         container.className = 'mermaid';
         code.parentElement.replaceWith(container);
         try {
-          const id = 'mermaid-' + Date.now() + '-' + i;
+          const id = 'mermaid-' + (mermaidSeq++);
           const result = await mermaid.render(id, code.textContent || '');
           container.innerHTML = result.svg;
         } catch (err) {
@@ -545,9 +547,9 @@ export function renderMarkdownPage(
       }
     };
 
-    window.highlightCode = () => {
+    window.highlightCode = (root) => {
       if (!hljs) return;
-      document.querySelectorAll('pre code').forEach((block) => {
+      (root || document).querySelectorAll('pre code').forEach((block) => {
         if (block.classList.contains('language-mermaid')) return;
         hljs.highlightElement(block);
       });
