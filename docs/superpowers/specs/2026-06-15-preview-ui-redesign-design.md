@@ -1,4 +1,4 @@
-# Design: Markdown Forge–style UI for Markdown Live Server
+# Design: Preview UI Redesign for Markdown Live Server
 
 **Date:** 2026-06-15
 **Status:** Approved (pending spec review)
@@ -6,7 +6,7 @@
 ## Goal
 
 Bring the in-browser preview UI of the **Markdown Live Server** VS Code extension up to
-the polish of the *Markdown Forge* plugin. Three workstreams:
+a more polished, modern look. Three workstreams:
 
 1. **Redesigned left menu** — branded header, icon-based file tree, and a footer with
    **Theme** and **Code Theme** selectors plus a light/dark toggle.

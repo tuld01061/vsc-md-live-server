@@ -1,14 +1,14 @@
-# Forge-style UI Implementation Plan
+# Preview UI Redesign Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give the Markdown Live Server preview a Markdown Forge–style UI: a branded sidebar with Theme + Code-Theme selectors, a main-view header bar (path crumb · Print · Edit · light/dark), and a CodeMirror 6 in-browser editor that writes back to disk from loopback only.
+**Goal:** Give the Markdown Live Server preview a polished, modern UI: a branded sidebar with Theme + Code-Theme selectors, a main-view header bar (path crumb · Print · Edit · light/dark), and a CodeMirror 6 in-browser editor that writes back to disk from loopback only.
 
 **Architecture:** A new pure-data module `src/themes.ts` holds the palette catalog (5 content palettes × light/dark) and the highlight.js code-theme catalog. `src/template.ts`'s `renderMarkdownPage` is rewritten to assemble the new chrome, theme system, and (when `editable`) the editor assets; it gains an `editable` 5th param. `src/server.ts` adds two loopback-guarded Express routes (`GET /__mdls__/source`, `POST /__mdls__/save`) registered before the catch-all, and passes `editable: true` for `.md` file pages. All client behavior is inline scripts served in the page (consistent with the existing template), and CodeMirror/markdown-it load from CDN with graceful fallback (consistent with the existing Mermaid/highlight.js loading).
 
 **Tech Stack:** TypeScript, Express, `ws`, markdown-it (server + CDN client), CodeMirror 6 (CDN ESM), highlight.js + Mermaid (CDN), vitest.
 
-**Spec:** [docs/superpowers/specs/2026-06-15-forge-style-ui-design.md](../specs/2026-06-15-forge-style-ui-design.md)
+**Spec:** [docs/superpowers/specs/2026-06-15-preview-ui-redesign-design.md](../specs/2026-06-15-preview-ui-redesign-design.md)
 
 ---
 
@@ -1091,7 +1091,7 @@ Expected: all suites pass.
 
 ```bash
 git add src/template.ts test/template.test.ts
-git commit -m "feat: Forge-style chrome, theme system, and in-browser editor"
+git commit -m "feat: redesigned chrome, theme system, and in-browser editor"
 ```
 
 ---
@@ -1148,7 +1148,7 @@ If steps 3–8 surface issues, fix them (re-running `npm test` after each), then
 
 ```bash
 git add -A
-git commit -m "fix: address manual QA findings for Forge-style UI"
+git commit -m "fix: address manual QA findings for preview UI redesign"
 ```
 
 ---
