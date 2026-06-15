@@ -9,6 +9,12 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { renderDirectoryMarkdownPage, renderHtmlPage, renderMarkdownPage } from './template';
 import { scanDirectory, TreeNode, ScanOptions } from './tree';
 
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+export function isLoopback(remoteAddress?: string): boolean {
+  return remoteAddress !== undefined && LOOPBACK_ADDRESSES.has(remoteAddress);
+}
+
 export interface MarkdownLiveServerOptions {
   port?: number;
   rootPath: string;
@@ -53,6 +59,58 @@ export class MarkdownLiveServer {
 
     const app = express();
 
+    app.use(express.json({ limit: '5mb' }));
+
+    app.get('/__mdls__/source', (request, response) => {
+      if (!isLoopback(request.socket.remoteAddress)) {
+        response.status(403).json({ error: 'forbidden' });
+        return;
+      }
+      const reqPath = typeof request.query.path === 'string' ? request.query.path : '';
+      const filePath = this.resolveRequestPath(reqPath);
+      if (!filePath || path.extname(filePath).toLowerCase() !== '.md') {
+        response.status(404).json({ error: 'not found' });
+        return;
+      }
+      try {
+        if (fs.statSync(filePath).isDirectory()) {
+          response.status(404).json({ error: 'not a file' });
+          return;
+        }
+        response.json({ content: fs.readFileSync(filePath, 'utf8') });
+      } catch {
+        response.status(404).json({ error: 'not found' });
+      }
+    });
+
+    app.post('/__mdls__/save', (request, response) => {
+      if (!isLoopback(request.socket.remoteAddress)) {
+        response.status(403).json({ error: 'forbidden' });
+        return;
+      }
+      const body = request.body as { path?: unknown; content?: unknown };
+      if (typeof body?.path !== 'string' || typeof body?.content !== 'string') {
+        response.status(400).json({ error: 'invalid body' });
+        return;
+      }
+      const filePath = this.resolveRequestPath(body.path);
+      if (!filePath || path.extname(filePath).toLowerCase() !== '.md') {
+        response.status(404).json({ error: 'not found' });
+        return;
+      }
+      try {
+        if (fs.statSync(filePath).isDirectory()) {
+          response.status(400).json({ error: 'not a file' });
+          return;
+        }
+        fs.writeFileSync(filePath, body.content, 'utf8');
+        this.broadcastChange(filePath, body.content);
+        response.json({ ok: true });
+      } catch (error) {
+        response.status(500).json({ error: error instanceof Error ? error.message : 'write failed' });
+      }
+    });
+
     app.get('*', (request, response, next) => {
       const filePath = this.resolveRequestPath(request.path);
       if (!filePath) {
@@ -75,7 +133,8 @@ export class MarkdownLiveServer {
           this.renderMarkdownFile(filePath),
           path.basename(filePath),
           this.currentPort(),
-          this.siteMenuOptions ? this.siteTree : undefined
+          this.siteMenuOptions ? this.siteTree : undefined,
+          true
         ));
         return;
       }

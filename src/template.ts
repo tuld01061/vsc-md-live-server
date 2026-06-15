@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { TreeNode } from './tree';
 
-export function renderMarkdownPage(content: string, title: string, port: number, siteTree?: TreeNode[]): string {
+export function renderMarkdownPage(content: string, title: string, port: number, siteTree?: TreeNode[], editable: boolean = false): string {
   const hasSidebar = siteTree !== undefined && siteTree.length > 0;
 
   const sidebarStyles = hasSidebar ? `

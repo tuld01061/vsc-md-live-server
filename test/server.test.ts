@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { WebSocket } from 'ws';
-import { MarkdownLiveServer } from '../src/server';
+import { MarkdownLiveServer, isLoopback } from '../src/server';
 
 describe('resolveRequestPath', () => {
   let tmpDir: string;
@@ -207,5 +207,80 @@ describe('broadcastTreeUpdate', () => {
     } finally {
       client.close();
     }
+  });
+});
+
+describe('isLoopback', () => {
+  it('accepts loopback addresses', () => {
+    expect(isLoopback('127.0.0.1')).toBe(true);
+    expect(isLoopback('::1')).toBe(true);
+    expect(isLoopback('::ffff:127.0.0.1')).toBe(true);
+  });
+
+  it('rejects non-loopback and undefined', () => {
+    expect(isLoopback('203.0.113.5')).toBe(false);
+    expect(isLoopback('192.168.1.10')).toBe(false);
+    expect(isLoopback(undefined)).toBe(false);
+  });
+});
+
+describe('edit endpoints', () => {
+  let tmpDir: string;
+  let server: MarkdownLiveServer;
+  let port: number;
+
+  beforeAll(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-live-edit-'));
+    fs.writeFileSync(path.join(tmpDir, 'a.md'), '# A');
+    fs.writeFileSync(path.join(tmpDir, 'note.txt'), 'plain');
+    server = new MarkdownLiveServer({ rootPath: tmpDir, entryPath: path.join(tmpDir, 'a.md') });
+    port = await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('GET source returns raw markdown for a valid path', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/source?path=${encodeURIComponent('/a.md')}`);
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { content: string };
+    expect(json.content).toBe('# A');
+  });
+
+  it('GET source rejects non-markdown paths', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/source?path=${encodeURIComponent('/note.txt')}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('POST save writes the file and returns ok', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/a.md', content: '# Changed' }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(fs.readFileSync(path.join(tmpDir, 'a.md'), 'utf8')).toBe('# Changed');
+  });
+
+  it('POST save rejects path traversal', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/../escape.md', content: 'x' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('POST save rejects an invalid body', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/__mdls__/save`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/a.md' }),
+    });
+    expect(res.status).toBe(400);
   });
 });
