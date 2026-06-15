@@ -2,6 +2,16 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.2.0
+
+- Redesigned the preview: branded sidebar with logo and an icon-based file tree (folder and file icons), plus a header bar showing the current file path with Print, Edit, and light/dark controls.
+- Added a Theme selector with 7 palettes — Aurora, Forest, Ghibli, Midnight, Modern, Ocean, and Sunset — each with light and dark variants; selections persist per browser.
+- Added a Code Theme selector for syntax highlighting (multiple Highlight.js themes).
+- Added in-browser Markdown editing with live preview; saving writes back to the file on disk and is restricted to local (`localhost`/`127.0.0.1`) viewers.
+- Added a configurable server port via `mdLiveServer.port` (default `4400`) with automatic fallback to the next free port when it is in use.
+- Fixed live reload for viewers on other devices: the reload socket now connects to the serving host instead of `127.0.0.1`.
+- Fixed live updates for files whose names contain non-ASCII characters or spaces.
+
 ## 0.1.0
 
 - Added site menu sidebar that auto-scans the workspace for `.md` and `.html` files.
