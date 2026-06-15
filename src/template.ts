@@ -305,7 +305,6 @@ export function renderMarkdownPage(
         contentSel.addEventListener('change', () => {
           root.dataset.theme = contentSel.value;
           localStorage.setItem('md-live-server-content-theme', contentSel.value);
-          if (window.renderMermaid) window.renderMermaid();
         });
       }
       const codeSel = document.getElementById('code-theme-select');
@@ -336,6 +335,7 @@ export function renderMarkdownPage(
     (function() {
       const editBtn = document.getElementById('edit-btn');
       if (!editBtn) return;
+      if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname)) { editBtn.remove(); return; }
       const editor = document.getElementById('md-editor');
       const contentEl = document.getElementById('content');
       const input = document.getElementById('editor-input');
@@ -433,7 +433,7 @@ export function renderMarkdownPage(
             const err = await res.json().catch(() => ({}));
             throw new Error(err.error || ('HTTP ' + res.status));
           }
-          contentEl.innerHTML = preview.innerHTML;
+          if (md) contentEl.innerHTML = preview.innerHTML; else location.reload();
           statusEl.textContent = 'Saved';
           closeEditor();
         } catch (e) { statusEl.textContent = 'Save failed: ' + e.message; }
