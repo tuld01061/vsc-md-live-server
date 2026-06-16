@@ -2,6 +2,12 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.2.1
+
+- Fixed the in-browser editor silently falling back to a plain textarea instead of the CodeMirror editor. CodeMirror (and markdown-it for the live preview) are now bundled with the extension and served locally, so the editor loads reliably and works offline instead of depending on an unreliable CDN.
+- Fixed code blocks not being syntax-highlighted in the preview (Highlight.js was loaded from a 404 CDN path; now uses a working endpoint).
+- Revamped the README for the Marketplace with a header, badges, and UI screenshots.
+
 ## 0.2.0
 
 - Redesigned the preview: branded sidebar with logo and an icon-based file tree (folder and file icons), plus a header bar showing the current file path with Print, Edit, and light/dark controls.

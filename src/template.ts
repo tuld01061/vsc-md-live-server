@@ -354,12 +354,12 @@ export function renderMarkdownPage(
       const statusEl = document.getElementById('editor-status');
       const saveBtn = document.getElementById('editor-save');
       const cancelBtn = document.getElementById('editor-cancel');
-      let cmView = null, fallbackArea = null, md = null, modeCompartment = null, oneDarkExt = null;
+      let cmHandle = null, fallbackArea = null, md = null;
       let loaded = false, debounceTimer;
 
-      function getValue() { return cmView ? cmView.state.doc.toString() : (fallbackArea ? fallbackArea.value : ''); }
+      function getValue() { return cmHandle ? cmHandle.getValue() : (fallbackArea ? fallbackArea.value : ''); }
       function setValue(text) {
-        if (cmView) cmView.dispatch({ changes: { from: 0, to: cmView.state.doc.length, insert: text } });
+        if (cmHandle) cmHandle.setValue(text);
         else if (fallbackArea) fallbackArea.value = text;
       }
       function renderPreview() {
@@ -370,39 +370,30 @@ export function renderMarkdownPage(
       }
       function scheduleRender() { clearTimeout(debounceTimer); debounceTimer = setTimeout(renderPreview, 200); }
 
+      function loadEditorBundle() {
+        return new Promise((resolve) => {
+          if (window.__MDLS_EDITOR__) return resolve();
+          const sc = document.createElement('script');
+          sc.src = '/__mdls__/editor.js';
+          sc.onload = () => resolve();
+          sc.onerror = () => resolve();
+          document.head.appendChild(sc);
+        });
+      }
+
       async function ensureEditor() {
         if (loaded) return;
         loaded = true;
-        try {
-          const mdMod = await import('https://esm.sh/markdown-it@14');
-          const MarkdownIt = mdMod.default || mdMod;
-          md = new MarkdownIt({ html: true, linkify: true, typographer: true });
-        } catch (e) { md = null; }
-        try {
-          const cm = await import('https://esm.sh/codemirror@6');
-          const langMd = await import('https://esm.sh/@codemirror/lang-markdown@6');
-          const st = await import('https://esm.sh/@codemirror/state@6');
-          const dark = await import('https://esm.sh/@codemirror/theme-one-dark@6');
-          oneDarkExt = dark.oneDark;
-          modeCompartment = new st.Compartment();
+        // CodeMirror + markdown-it are bundled into the extension and served locally
+        // (no CDN), so the editor loads reliably and offline.
+        await loadEditorBundle();
+        const api = window.__MDLS_EDITOR__;
+        if (api && api.createEditor) {
+          md = { render: api.renderMarkdown };
           const startDark = document.documentElement.dataset.mode === 'dark';
-          cmView = new cm.EditorView({
-            parent: input,
-            state: cm.EditorState.create({
-              doc: '',
-              extensions: [
-                cm.basicSetup,
-                langMd.markdown(),
-                cm.EditorView.lineWrapping,
-                modeCompartment.of(startDark ? oneDarkExt : []),
-                cm.EditorView.updateListener.of((u) => { if (u.docChanged) scheduleRender(); }),
-              ],
-            }),
-          });
-          window.__MDLS_SET_CM_MODE__ = (isDark) => {
-            if (cmView && modeCompartment) cmView.dispatch({ effects: modeCompartment.reconfigure(isDark ? oneDarkExt : []) });
-          };
-        } catch (e) {
+          cmHandle = api.createEditor(input, { dark: startDark, doc: '', onChange: scheduleRender });
+          window.__MDLS_SET_CM_MODE__ = (isDark) => { if (cmHandle) cmHandle.setDark(isDark); };
+        } else {
           fallbackArea = document.createElement('textarea');
           fallbackArea.className = 'editor-fallback';
           fallbackArea.addEventListener('input', scheduleRender);
@@ -424,7 +415,7 @@ export function renderMarkdownPage(
         contentEl.hidden = true;
         editor.hidden = false;
         renderPreview();
-        if (cmView) cmView.focus(); else if (fallbackArea) fallbackArea.focus();
+        if (cmHandle) cmHandle.focus(); else if (fallbackArea) fallbackArea.focus();
       }
       function closeEditor() {
         window.__MDLS_EDITING__ = false;
@@ -514,7 +505,7 @@ export function renderMarkdownPage(
 
     let hljs;
     try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/highlight.js@11/es/highlight.min.js');
+      const mod = await import('https://cdn.jsdelivr.net/npm/highlight.js@11/+esm');
       hljs = mod.default || mod;
     } catch (e) { console.warn('Highlight.js failed to load from CDN', e); }
 

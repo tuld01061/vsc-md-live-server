@@ -20,6 +20,8 @@ export interface MarkdownLiveServerOptions {
   rootPath: string;
   entryPath: string;
   siteMenu?: ScanOptions;
+  /** Absolute path to the bundled in-browser editor script (out/editor.js). */
+  editorScriptPath?: string;
 }
 
 interface ReloadMessage {
@@ -44,6 +46,7 @@ export class MarkdownLiveServer {
   private webSocketServer?: WebSocketServer;
   private siteTree: TreeNode[] = [];
   private readonly siteMenuOptions?: ScanOptions;
+  private readonly editorScriptPath: string;
 
   constructor(options: MarkdownLiveServerOptions) {
     this.port = options.port ?? 0;
@@ -51,6 +54,7 @@ export class MarkdownLiveServer {
     this.rootRealPath = fs.realpathSync(options.rootPath);
     this.entryPath = options.entryPath;
     this.siteMenuOptions = options.siteMenu;
+    this.editorScriptPath = options.editorScriptPath ?? path.join(__dirname, 'editor.js');
   }
 
   async start(): Promise<number> {
@@ -61,6 +65,14 @@ export class MarkdownLiveServer {
     const app = express();
 
     app.use(express.json({ limit: '5mb' }));
+
+    app.get('/__mdls__/editor.js', (_request, response) => {
+      try {
+        response.type('application/javascript').send(fs.readFileSync(this.editorScriptPath, 'utf8'));
+      } catch {
+        response.status(404).send('// editor bundle not available');
+      }
+    });
 
     app.get('/__mdls__/source', (request, response) => {
       if (!isLoopback(request.socket.remoteAddress)) {
