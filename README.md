@@ -6,9 +6,8 @@
 
 **A fast, themeable live preview for Markdown — Mermaid diagrams, syntax‑highlighted code, and in‑browser editing, right from VS Code.**
 
-[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/tuld01061.md-live-server?color=2563eb&label=Marketplace&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=tuld01061.md-live-server)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/tuld01061.md-live-server?color=16a34a)](https://marketplace.visualstudio.com/items?itemName=tuld01061.md-live-server)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/tuld01061.md-live-server?color=f59e0b)](https://marketplace.visualstudio.com/items?itemName=tuld01061.md-live-server)
+[![VS Marketplace](https://vsmarketplacebadges.dev/version-short/tuld01061.md-live-server.png?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=tuld01061.md-live-server)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/tuld01061.md-live-server.png)](https://marketplace.visualstudio.com/items?itemName=tuld01061.md-live-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -17,7 +16,7 @@
 
 Start a local server from VS Code and preview your Markdown in the browser. The page reloads the instant you save, Mermaid diagrams and code render beautifully, and you can switch themes or edit the file right in the page.
 
-![Overview](images/screenshots/overview.png)
+![Overview](images/screenshots/theme-sunset.png)
 
 ## ✨ Highlights
 
@@ -38,7 +37,7 @@ Pick a **Theme** and **Code Theme** from the sidebar, and toggle light/dark from
 <table>
   <tr>
     <td width="50%"><img src="images/screenshots/dark-ocean.png" alt="Ocean theme, dark mode" /></td>
-    <td width="50%"><img src="images/screenshots/theme-sunset.png" alt="Sunset theme, light mode" /></td>
+    <td width="50%"><img src="images/screenshots/overview.png" alt="Sunset theme, light mode" /></td>
   </tr>
   <tr>
     <td align="center"><em>Ocean · dark</em></td>
