@@ -3,6 +3,8 @@
 .claude/**
 .vscode/**
 .vscode-test/**
+docs/**
+images/screenshots/**
 node_modules/**
 src/**
 test/**
