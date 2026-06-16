@@ -379,25 +379,39 @@ export function renderMarkdownPage(
           md = new MarkdownIt({ html: true, linkify: true, typographer: true });
         } catch (e) { md = null; }
         try {
-          const cm = await import('https://esm.sh/codemirror@6');
+          // Import CodeMirror 6 from its sub-packages. The 'codemirror' meta-package
+          // (which holds basicSetup) does not expose CM6 named exports via the CDN, so
+          // we compose an equivalent setup from the individual modules instead.
+          const view = await import('https://esm.sh/@codemirror/view@6');
+          const stateMod = await import('https://esm.sh/@codemirror/state@6');
+          const commands = await import('https://esm.sh/@codemirror/commands@6');
+          const language = await import('https://esm.sh/@codemirror/language@6');
           const langMd = await import('https://esm.sh/@codemirror/lang-markdown@6');
-          const st = await import('https://esm.sh/@codemirror/state@6');
           const dark = await import('https://esm.sh/@codemirror/theme-one-dark@6');
+          const EditorView = view.EditorView;
+          const EditorState = stateMod.EditorState;
           oneDarkExt = dark.oneDark;
-          modeCompartment = new st.Compartment();
+          modeCompartment = new stateMod.Compartment();
           const startDark = document.documentElement.dataset.mode === 'dark';
-          cmView = new cm.EditorView({
+          const setup = [
+            view.lineNumbers(),
+            view.highlightActiveLineGutter(),
+            view.highlightActiveLine(),
+            view.drawSelection(),
+            view.dropCursor(),
+            commands.history(),
+            language.indentOnInput(),
+            language.bracketMatching(),
+            language.syntaxHighlighting(language.defaultHighlightStyle, { fallback: true }),
+            view.keymap.of([...commands.defaultKeymap, ...commands.historyKeymap]),
+            EditorView.lineWrapping,
+            langMd.markdown(),
+            modeCompartment.of(startDark ? oneDarkExt : []),
+            EditorView.updateListener.of((u) => { if (u.docChanged) scheduleRender(); }),
+          ];
+          cmView = new EditorView({
             parent: input,
-            state: cm.EditorState.create({
-              doc: '',
-              extensions: [
-                cm.basicSetup,
-                langMd.markdown(),
-                cm.EditorView.lineWrapping,
-                modeCompartment.of(startDark ? oneDarkExt : []),
-                cm.EditorView.updateListener.of((u) => { if (u.docChanged) scheduleRender(); }),
-              ],
-            }),
+            state: EditorState.create({ doc: '', extensions: setup }),
           });
           window.__MDLS_SET_CM_MODE__ = (isDark) => {
             if (cmView && modeCompartment) cmView.dispatch({ effects: modeCompartment.reconfigure(isDark ? oneDarkExt : []) });
@@ -514,7 +528,7 @@ export function renderMarkdownPage(
 
     let hljs;
     try {
-      const mod = await import('https://cdn.jsdelivr.net/npm/highlight.js@11/es/highlight.min.js');
+      const mod = await import('https://cdn.jsdelivr.net/npm/highlight.js@11/+esm');
       hljs = mod.default || mod;
     } catch (e) { console.warn('Highlight.js failed to load from CDN', e); }
 
