@@ -69,6 +69,13 @@ describe('renderMarkdownPage', () => {
     const html = renderMarkdownPage('# Hi', 'a.md', tree, true);
     expect(html).toContain('M82 88V40h14v36h20v12H82z');
   });
+
+  it('includes the Mermaid fullscreen modal viewer', () => {
+    const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
+    const html = renderMarkdownPage('# Hi', 'a.md', tree, true);
+    expect(html).toContain('openMermaidModal');
+    expect(html).toContain('mermaid-fullscreen-btn');
+  });
 });
 
 describe('renderHtmlPage', () => {

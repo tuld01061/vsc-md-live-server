@@ -23,7 +23,7 @@ Start a local server from VS Code and preview your Markdown in the browser. The 
 ## ✨ Highlights
 
 - **⚡ Live reload** — save any file and the browser updates instantly.
-- **📊 Mermaid diagrams** — fenced `mermaid` blocks render inline.
+- **📊 Mermaid diagrams** — fenced `mermaid` blocks render inline, and open in a **full‑page viewer** with zoom & pan.
 - **🌈 Syntax highlighting** — choose from many code themes (GitHub, Dracula, Nord, Tokyo Night, and more).
 - **🎨 7 themes × light/dark** — Aurora, Forest, Ghibli, Midnight, Modern, Ocean, Sunset.
 - **📝 In‑browser editing** — edit Markdown in a CodeMirror editor with live preview; saving writes back to disk (local only).
@@ -55,7 +55,7 @@ Click the **pencil** in the header to open a split CodeMirror editor with a live
 
 ## 🧩 Diagrams & code
 
-Fenced `mermaid` blocks render as diagrams, and code blocks are syntax‑highlighted with your chosen code theme.
+Fenced `mermaid` blocks render as diagrams, and code blocks are syntax‑highlighted with your chosen code theme. Hover a diagram and click **View Fullscreen** to open it in a full‑page modal you can zoom (scroll or the +/− buttons), pan (drag), fit to screen, and close with <kbd>Esc</kbd>.
 
 ```mermaid
 flowchart LR

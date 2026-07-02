@@ -114,6 +114,44 @@ export function renderMarkdownPage(
       #site-menu, #app-header, #md-editor { display: none !important; }
       #content { max-width: none; padding: 0; }
     }
+
+    /* Mermaid Modal Styles */
+    .mermaid { position: relative; }
+    .mermaid-fullscreen-btn {
+      position: absolute; top: 0.5rem; right: 0.5rem;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 0.3rem 0.5rem; cursor: pointer;
+      opacity: 0; transition: opacity 0.2s; color: var(--fg);
+      font-size: 0.8rem; z-index: 10;
+    }
+    .mermaid:hover .mermaid-fullscreen-btn { opacity: 1; }
+    
+    .mermaid-modal {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: var(--bg); z-index: 9999;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .mermaid-modal-header {
+      display: flex; justify-content: flex-end; padding: 1rem;
+      background: transparent;
+      gap: 0.5rem; flex: none; position: absolute; top: 0; right: 0; z-index: 10;
+    }
+    .mermaid-modal-header button {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 0.4rem; cursor: pointer; color: var(--fg);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0.8;
+    }
+    .mermaid-modal-header button:hover { background: var(--code-bg); opacity: 1; }
+    .mermaid-modal-header button svg { width: 1.2rem; height: 1.2rem; }
+    .mermaid-modal-content {
+      flex: 1; overflow: hidden; cursor: grab;
+      position: relative;
+    }
+    .mermaid-modal-content svg {
+      position: absolute; top: 0; left: 0;
+      transform-origin: 0 0;
+    }
   `;
 
   const headerHtml = `
@@ -537,6 +575,11 @@ export function renderMarkdownPage(
           const id = 'mermaid-' + (mermaidSeq++);
           const result = await mermaid.render(id, code.textContent || '');
           container.innerHTML = result.svg;
+          const btn = document.createElement('button');
+          btn.className = 'mermaid-fullscreen-btn';
+          btn.textContent = 'View Fullscreen';
+          btn.onclick = () => window.openMermaidModal && window.openMermaidModal(result.svg);
+          container.appendChild(btn);
         } catch (err) {
           const pre = document.createElement('pre');
           pre.style.color = 'var(--muted)';
@@ -559,6 +602,156 @@ export function renderMarkdownPage(
 
     window.renderMermaid();
     window.highlightCode();
+
+    window.openMermaidModal = (svgString) => {
+      const modal = document.createElement('div');
+      modal.className = 'mermaid-modal';
+      
+      const header = document.createElement('div');
+      header.className = 'mermaid-modal-header';
+      
+      const createIconBtn = (svgPath, title) => {
+        const btn = document.createElement('button');
+        btn.title = title;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + svgPath + '</svg>';
+        return btn;
+      };
+      
+      const btnZoomOut = createIconBtn('<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line>', 'Zoom Out');
+      const btnZoomIn = createIconBtn('<circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line>', 'Zoom In');
+      const btnFit = createIconBtn('<polyline points="4 9 4 4 9 4"></polyline><polyline points="20 9 20 4 15 4"></polyline><polyline points="4 15 4 20 9 20"></polyline><polyline points="20 15 20 20 15 20"></polyline>', 'Fit to screen');
+      const btnClose = createIconBtn('<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>', 'Close');
+      
+      header.appendChild(btnZoomOut);
+      header.appendChild(btnZoomIn);
+      header.appendChild(btnFit);
+      header.appendChild(btnClose);
+      
+      const content = document.createElement('div');
+      content.className = 'mermaid-modal-content';
+      content.innerHTML = svgString;
+      const svg = content.querySelector('svg');
+      if (svg) {
+         svg.style.maxWidth = 'none';
+         svg.style.height = 'auto';
+         const viewBox = svg.getAttribute('viewBox');
+         if (viewBox) {
+            const parts = viewBox.split(' ');
+            if (parts.length === 4) {
+               svg.style.width = parts[2] + 'px';
+               svg.style.height = parts[3] + 'px';
+            }
+         }
+      }
+      
+      modal.appendChild(header);
+      modal.appendChild(content);
+      document.body.appendChild(modal);
+      
+      if (!svg) return;
+
+      let scale = 1;
+      let translateX = 0;
+      let translateY = 0;
+      let isDragging = false;
+      let startX = 0, startY = 0;
+      let initialTranslateX = 0, initialTranslateY = 0;
+      let ticking = false;
+      
+      const updateTransform = () => {
+        svg.style.transform = 'translate(' + translateX + 'px, ' + translateY + 'px) scale(' + scale + ')';
+      };
+      
+      const requestUpdate = () => {
+        if (!ticking) {
+          requestAnimationFrame(() => { updateTransform(); ticking = false; });
+          ticking = true;
+        }
+      };
+      
+      content.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        initialTranslateX = translateX;
+        initialTranslateY = translateY;
+      });
+      
+      const onMouseMove = (e) => {
+        if (!isDragging) return;
+        translateX = initialTranslateX + (e.clientX - startX);
+        translateY = initialTranslateY + (e.clientY - startY);
+        requestUpdate();
+      };
+      
+      const onMouseUp = () => { isDragging = false; };
+      
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', onMouseUp);
+      
+      const zoom = (factor, mouseX, mouseY) => {
+        const newScale = Math.max(0.1, Math.min(scale * factor, 20));
+        let centerX = mouseX;
+        let centerY = mouseY;
+        if (centerX === undefined || centerY === undefined) {
+           const contentRect = content.getBoundingClientRect();
+           centerX = contentRect.width / 2;
+           centerY = contentRect.height / 2;
+        }
+        
+        translateX = centerX - (centerX - translateX) * (newScale / scale);
+        translateY = centerY - (centerY - translateY) * (newScale / scale);
+        scale = newScale;
+        requestUpdate();
+      };
+      
+      content.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        zoom(factor, e.clientX, e.clientY);
+      }, { passive: false });
+      
+      btnZoomIn.onclick = () => zoom(1.2);
+      btnZoomOut.onclick = () => zoom(1 / 1.2);
+      
+      const fitToScreen = () => {
+        svg.style.transform = 'none';
+        const rect = svg.getBoundingClientRect();
+        const contentRect = content.getBoundingClientRect();
+        
+        if (rect.width > 0 && rect.height > 0) {
+          const padding = 40;
+          const scaleX = (contentRect.width - padding) / rect.width;
+          const scaleY = (contentRect.height - padding) / rect.height;
+          scale = Math.min(scaleX, scaleY);
+          translateX = (contentRect.width - rect.width * scale) / 2;
+          translateY = (contentRect.height - rect.height * scale) / 2;
+        } else {
+          scale = 1;
+          translateX = 0;
+          translateY = 0;
+        }
+        updateTransform();
+      };
+      
+      btnFit.onclick = fitToScreen;
+      
+      // Initial fit to screen
+      requestAnimationFrame(() => fitToScreen());
+      
+      const onKeyDown = (e) => { if (e.key === 'Escape') closeModal(); };
+      document.addEventListener('keydown', onKeyDown);
+      
+      const cleanup = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('keydown', onKeyDown);
+      };
+      
+      const closeModal = () => { cleanup(); document.body.removeChild(modal); };
+      btnClose.onclick = closeModal;
+    };
   </script>
   <style>${pageStyles}</style>
 </head>

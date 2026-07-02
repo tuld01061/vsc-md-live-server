@@ -2,6 +2,11 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.2.2
+
+- Added a full-page Mermaid viewer: hover a diagram and click **View Fullscreen** to open it in a modal you can zoom (scroll or buttons), pan (drag), fit to screen, and close with `Esc`.
+- The extension is now also published to the Open VSX registry on release (for VS Code–compatible editors such as VSCodium and Cursor).
+
 ## 0.2.1
 
 - Fixed the in-browser editor silently falling back to a plain textarea instead of the CodeMirror editor. CodeMirror (and markdown-it for the live preview) are now bundled with the extension and served locally, so the editor loads reliably and works offline instead of depending on an unreliable CDN.
