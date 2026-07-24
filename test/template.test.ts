@@ -35,6 +35,18 @@ describe('renderMarkdownPage', () => {
     expect(html).toContain('id="print-btn"');
   });
 
+  it('forces theme colors to render when printing to PDF', () => {
+    const html = renderMarkdownPage('# Hi', 'a.md');
+    expect(html).toContain('print-color-adjust: exact');
+    expect(html).toContain('background: var(--bg) !important');
+  });
+
+  it('fits Mermaid diagrams within a single page when printing', () => {
+    const html = renderMarkdownPage('# Hi', 'a.md');
+    expect(html).toContain('.mermaid svg { max-width: 100% !important; max-height: 90vh !important');
+    expect(html).toContain('.mermaid { break-inside: avoid; page-break-inside: avoid');
+  });
+
   it('includes editor assets when editable', () => {
     const tree: TreeNode[] = [{ name: 'a.md', path: '/a.md', type: 'file' }];
     const html = renderMarkdownPage('# Hi', 'a.md', tree, true);

@@ -110,9 +110,19 @@ export function renderMarkdownPage(
       .editor-split { grid-template-columns: 1fr; height: auto; }
     }
     @media print {
+      html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
+      body { background: var(--bg) !important; color: var(--fg) !important; }
       body.has-sidebar { padding-left: 0 !important; }
       #site-menu, #app-header, #md-editor { display: none !important; }
       #content { max-width: none; padding: 0; }
+      pre, code, blockquote, table, th, td, .hljs, .hljs * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      /* Keep blocks from being split across pages */
+      pre, blockquote, table, img, figure { break-inside: avoid; page-break-inside: avoid; }
+      h1, h2, h3, h4, h5, h6 { break-after: avoid; page-break-after: avoid; }
+      /* Fit each Mermaid diagram within a single page */
+      .mermaid { break-inside: avoid; page-break-inside: avoid; text-align: center; }
+      .mermaid svg { max-width: 100% !important; max-height: 90vh !important; width: auto !important; height: auto !important; }
+      .mermaid-fullscreen-btn { display: none !important; }
     }
 
     /* Mermaid Modal Styles */

@@ -2,6 +2,11 @@
 
 All notable changes to Markdown Live Server are documented here.
 
+## 0.2.3
+
+- Fixed PDF export (Print → Save as PDF) ignoring the selected theme: the preview now forces `print-color-adjust: exact` so the chosen content theme's background and code syntax-highlight colors are preserved in the PDF instead of being stripped to white.
+- Improved PDF layout for Mermaid diagrams: each diagram is scaled to fit within a single page and is no longer split across page breaks. Code blocks, tables, images, and blockquotes also avoid mid-page breaks, and the diagram's "View Fullscreen" button is hidden when printing.
+
 ## 0.2.2
 
 - Added a full-page Mermaid viewer: hover a diagram and click **View Fullscreen** to open it in a modal you can zoom (scroll or buttons), pan (drag), fit to screen, and close with `Esc`.
